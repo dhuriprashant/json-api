@@ -1,0 +1,65 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## What this is
+
+A configuration-driven Apex framework that exposes Salesforce SObjects over a REST API conforming to [JSON:API v1.1](https://jsonapi.org/format/). All code lives in `force-app/main/default/classes/` (Apex `.cls` + `.cls-meta.xml`). There is no LWC, no JS build — it is a pure Apex Salesforce DX project.
+
+Two reference resources ship: `accounts` (Account) and `contacts` (Contact). Full endpoint/query-param reference and a "how to add a resource" walkthrough live in `force-app/main/default/classes/JSON-API-README.md`.
+
+## Commands
+
+The framework's own tests are run as a named set (`RunSpecifiedTests`) so unrelated broken tests in the target org don't block it.
+
+```powershell
+# Deploy
+sf project deploy start -d force-app -o <org>
+
+# Validate without saving (compiles + runs this framework's tests, persists nothing)
+sf project deploy validate -d force-app -o <org> -l RunSpecifiedTests `
+  -t JsonApiServiceTest -t JsonApiRequestParserTest `
+  -t JsonApiRestResourceTest -t JsonApiCoverageTest
+
+# Run the test suite with coverage
+sf apex run test -o <org> -l RunSpecifiedTests -c `
+  -t JsonApiServiceTest -t JsonApiRequestParserTest `
+  -t JsonApiRestResourceTest -t JsonApiCoverageTest
+
+# Run a single test class
+sf apex run test -o <org> -l RunSpecifiedTests -t JsonApiServiceTest -c
+```
+
+The four test classes are `JsonApiServiceTest`, `JsonApiRequestParserTest`, `JsonApiRestResourceTest`, and `JsonApiCoverageTest`. The tests insert real `Account`/`Contact` records — a broken Account/Contact trigger in the target org will make them fail (an org problem, not a framework one). Validate in a clean scratch org.
+
+## Request flow
+
+A request walks one path through the layers; understanding this sequence is the fastest way to orient:
+
+1. **`JsonApiRestResource`** (`@RestResource(urlMapping='/jsonapi/*')`) — the only HTTP entry point. Handles HTTP concerns only: content negotiation (enforces the `application/vnd.api+json` media type → 415/406), splits the URI into path segments after the `jsonapi` base, catches exceptions and renders them. Delegates everything else to the service.
+2. **`JsonApiService`** — the orchestration core. Contains the routing table (maps verb + segment shape to an operation) and runs all SOQL/DML in `AccessLevel.USER_MODE`.
+3. **`JsonApiRegistry` / `JsonApiBootstrap`** — `forType(type)` resolves the JSON:API type string to its config, throwing 404 if unregistered. The registry lazily self-initializes by calling `JsonApiBootstrap.registerAll()` on first lookup.
+4. **`JsonApiRequestParser` → `JsonApiQueryOptions`** — parses query params (`include`, `fields[]`, `sort`, `filter[]`, `page[]`) into a typed options object.
+5. **`JsonApiQueryBuilder`** — builds SOQL strings + a `binds` map from config + options. All field/object names come from configs (never user input); all filter values are bind variables — no SOQL injection.
+6. **`JsonApiSerializer` / `JsonApiDeserializer` / `JsonApiIncludeResolver`** — convert SObjects ↔ the document model. The include resolver populates the top-level `included` array.
+7. **Document model** — `JsonApiDocument`, `JsonApiResourceObject`, `JsonApiResourceIdentifier`, `JsonApiRelationship`, `JsonApiError`, `JsonApiErrorSource`. `JsonApiResponse` wraps status + headers + document.
+8. **`JsonApiException`** — typed errors with factory methods (`notFound`, `badRequest`, `conflict`, `unsupportedMediaType`, etc.) carrying HTTP status + JSON:API `errors[]`.
+
+`JsonApiConstants` holds the media type and `BASE_PATH`.
+
+## Adding a resource (the central extension point)
+
+The whole framework is driven by `JsonApiResourceConfig` subclasses. To expose a new SObject:
+
+1. Subclass `JsonApiResourceConfig`. Three abstract methods are required: `getType()` (the JSON:API type string), `getSObjectType()`, and `getAttributeMap()` (JSON:API attribute name → SObject field API name; **do not** map `id` here). Optionally override `getRelationships()` and `getWritableAttributes()` (defaults to all mapped attributes — override to exclude formula/rollup/system fields). See `AccountResourceConfig` / `ContactResourceConfig`.
+2. Add one line to `JsonApiBootstrap.registerAll()`: `JsonApiRegistry.register(new YourResourceConfig());`
+
+Relationships are declared via `JsonApiRelationshipDef.toOne(name, targetType, lookupField)` (lookup field on this object) or `JsonApiRelationshipDef.toMany(name, targetType, childForeignKeyField)` (FK field on the child object).
+
+## Conventions & constraints
+
+- Apex API version is `58.0` (`sfdx-project.json`); no namespace.
+- All data access must stay in `AccessLevel.USER_MODE` to keep CRUD/FLS enforcement — preserve this in any new query/DML path.
+- Filtering is equality-only; extend `JsonApiQueryBuilder.computeWhere()` to add operators.
+- `include` inlines the `included` array and to-one linkage; to-many linkage is exposed via the relationship endpoints, not inlined in primary `data`.
+- Bulk/atomic operations and writes to relationship endpoints are not implemented.
