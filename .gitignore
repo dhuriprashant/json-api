@@ -1,0 +1,30 @@
+# Salesforce DX
+.sfdx/
+*.log
+*.csv
+*.zip
+*.data
+*.tmp
+*.cache
+node_modules/
+coverage/
+.vscode/
+.DS_Store
+Thumbs.db
+.sf
+.claude
+
+# Salesforce generated files
+*.dup
+*.resource
+
+# Ignore local scratch org auth and encrypted files
+# .sfdx directory already ignored above
+
+# Ignore Salesforce CLI local scratch org history
+.sfdx/*-org*
+
+# Ignore local IDE/workspace settings
+.idea/
+*.swp
+*.swo
