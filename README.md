@@ -9,7 +9,7 @@ compound documents (`include`), content negotiation, and spec-compliant errors �
 all enforced under the running user's CRUD/FLS via `AccessLevel.USER_MODE`.
 
 > 📖 Full reference docs (endpoints, query params, examples, architecture, how to
-> add a resource) live in [`force-app/main/default/classes/README.md`](force-app/main/default/classes/README.md).
+> add a resource) live in [`force-app/main/default/classes/JSON-API-README.md`](force-app/main/default/classes/JSON-API-README.md).
 
 ---
 
@@ -89,7 +89,7 @@ curl "$INSTANCE_URL/services/apexrest/jsonapi/accounts?fields[accounts]=name,ind
 2. Register it with one line in `JsonApiBootstrap.registerAll()`.
 
 That's it — the new type is live. Full walkthrough in the
-[framework README](force-app/main/default/classes/README.md#adding-a-new-resource).
+[framework README](force-app/main/default/classes/JSON-API-README.md#adding-a-new-resource).
 
 ---
 

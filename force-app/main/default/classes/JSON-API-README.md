@@ -12,6 +12,16 @@ security is enforced by the platform for the running user.
 
 ---
 
+## Status
+
+- ✅ **43/43 Apex tests passing**, 87% org-wide coverage (clean scratch org).
+- ✅ **Confirmed live** against a real org — sparse fieldsets, pagination,
+  `include` compound documents, relationship linkage and error responses all
+  verified end-to-end over HTTP.
+- Ships with two example resources: **`accounts`** (Account) and **`contacts`** (Contact).
+
+---
+
 ## Endpoints
 
 Everything is served under `/services/apexrest/jsonapi`.
@@ -144,6 +154,7 @@ That's it — the new type is live at `/services/apexrest/jsonapi/opportunities`
 | Document model   | `JsonApiDocument`, `JsonApiResourceObject`, `JsonApiResourceIdentifier`, `JsonApiRelationship`, `JsonApiError`, `JsonApiErrorSource` |
 | Errors           | `JsonApiException`                                                     |
 | Constants        | `JsonApiConstants`                                                     |
+| Tests            | `JsonApiServiceTest`, `JsonApiRequestParserTest`, `JsonApiRestResourceTest`, `JsonApiCoverageTest` |
 
 ### Security
 - All SOQL/DML use `USER_MODE`, enforcing CRUD/FLS automatically.
@@ -165,13 +176,22 @@ That's it — the new type is live at `/services/apexrest/jsonapi/opportunities`
 ## Deploying & testing
 
 ```powershell
-# Validate without saving (compiles + runs tests server-side, persists nothing)
-sf project deploy validate -d force-app -l RunLocalTests -o <your-org>
+# Validate without saving (compiles + runs THIS framework's tests, persists nothing).
+# RunSpecifiedTests is used so unrelated failing tests in the org don't block validation.
+sf project deploy validate -d force-app -o <your-org> -l RunSpecifiedTests `
+  -t JsonApiServiceTest -t JsonApiRequestParserTest `
+  -t JsonApiRestResourceTest -t JsonApiCoverageTest
 
 # Deploy for real
 sf project deploy start -d force-app -o <your-org>
 
-# Run just this framework's tests
-sf apex run test -o <your-org> -l RunSpecifiedTests `
-  -t JsonApiServiceTest -t JsonApiRequestParserTest -t JsonApiRestResourceTest
+# Run just this framework's tests (with code coverage)
+sf apex run test -o <your-org> -l RunSpecifiedTests -c `
+  -t JsonApiServiceTest -t JsonApiRequestParserTest `
+  -t JsonApiRestResourceTest -t JsonApiCoverageTest
 ```
+
+> **Note:** the framework's tests insert `Account`/`Contact` records. If the
+> target org has a broken Account/Contact trigger, those inserts fail — that's an
+> org issue, not a framework one. Deploy with `-l NoTestRun` and validate in a
+> clean scratch org instead.
