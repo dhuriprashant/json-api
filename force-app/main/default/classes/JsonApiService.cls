@@ -1,58 +1,39 @@
 /**
  * The orchestration core of the framework. Given an HTTP method, the path
- * segments after the API base, the query parameters and an optional request
- * body, it performs the matching JSON:API operation and returns a
- * {@link JsonApiResponse}.
+ * segments after the API base and the query parameters, it performs the matching
+ * JSON:API read operation and returns a {@link JsonApiResponse}.
+ *
+ * This API is read-only: only GET is served. Any other method is rejected with
+ * 405 Method Not Allowed.
  *
  * Routing table:
  *   GET    /{type}                          collection
  *   GET    /{type}/{id}                      single resource
  *   GET    /{type}/{id}/{relationship}       related resource(s)
  *   GET    /{type}/{id}/relationships/{rel}  relationship linkage
- *   POST   /{type}                           create
- *   PATCH  /{type}/{id}                       update
- *   DELETE /{type}/{id}                       delete
  *
- * All SOQL and DML run in AccessLevel.USER_MODE, so object- and field-level
- * security is enforced by the platform on the running user's behalf.
+ * All SOQL runs in AccessLevel.USER_MODE, so object- and field-level security is
+ * enforced by the platform on the running user's behalf.
  */
 public with sharing class JsonApiService {
 
-    private final String baseUrl = JsonApiConstants.BASE_PATH;
     private final JsonApiSerializer serializer = new JsonApiSerializer(JsonApiConstants.BASE_PATH);
 
     public JsonApiResponse handle(
         String method,
         List<String> segments,
-        Map<String, String> params,
-        String body
+        Map<String, String> params
     ) {
         if (segments == null || segments.isEmpty()) {
             throw JsonApiException.badRequest('A resource type is required in the path.', null);
         }
-        String type = segments[0];
-        JsonApiResourceConfig config = JsonApiRegistry.forType(type);
-
-        switch on method.toUpperCase() {
-            when 'GET' {
-                return handleGet(config, segments, params);
-            }
-            when 'POST' {
-                requireCollection(segments);
-                return create(config, body);
-            }
-            when 'PATCH' {
-                String id = requireResourceId(segments);
-                return updateRecord(config, id, body);
-            }
-            when 'DELETE' {
-                String id = requireResourceId(segments);
-                return remove(config, id);
-            }
-            when else {
-                throw JsonApiException.methodNotAllowed('Method "' + method + '" is not supported.');
-            }
+        String verb = method == null ? '' : method.toUpperCase();
+        if (verb != 'GET') {
+            throw JsonApiException.methodNotAllowed('This API is read-only; only GET is supported.');
         }
+
+        JsonApiResourceConfig config = JsonApiRegistry.forType(segments[0]);
+        return handleGet(config, segments, params);
     }
 
     // ---------------------------------------------------------------------
@@ -165,49 +146,6 @@ public with sharing class JsonApiService {
     }
 
     // ---------------------------------------------------------------------
-    // POST / PATCH / DELETE
-    // ---------------------------------------------------------------------
-
-    private JsonApiResponse create(JsonApiResourceConfig config, String body) {
-        SObject record = new JsonApiDeserializer().toSObject(parseBodyData(body), config, false);
-        Database.SaveResult sr = Database.insert(record, true, AccessLevel.USER_MODE);
-        if (!sr.isSuccess()) {
-            throw toException(sr.getErrors());
-        }
-        SObject reloaded = queryOne(config, sr.getId(), new JsonApiQueryOptions());
-        JsonApiDocument doc = JsonApiDocument.ofData(serializer.toResource(reloaded, config, new JsonApiQueryOptions()));
-        return new JsonApiResponse(201, doc)
-            .withHeader('Location', serializer.resourceUrl(config.getType(), sr.getId()));
-    }
-
-    private JsonApiResponse updateRecord(JsonApiResourceConfig config, String id, String body) {
-        Object data = parseBodyData(body);
-        SObject record = new JsonApiDeserializer().toSObject(data, config, true);
-        if (String.valueOf(record.get('Id')) != id) {
-            throw JsonApiException.conflict('The id in the request body does not match the id in the URL.');
-        }
-        Database.SaveResult sr = Database.update(record, true, AccessLevel.USER_MODE);
-        if (!sr.isSuccess()) {
-            throw toException(sr.getErrors());
-        }
-        SObject reloaded = queryOne(config, id, new JsonApiQueryOptions());
-        return new JsonApiResponse(200,
-            JsonApiDocument.ofData(serializer.toResource(reloaded, config, new JsonApiQueryOptions())));
-    }
-
-    private JsonApiResponse remove(JsonApiResourceConfig config, String id) {
-        SObject record = queryOne(config, id, new JsonApiQueryOptions());
-        if (record == null) {
-            throw JsonApiException.notFound('No ' + config.getType() + ' with id "' + id + '".');
-        }
-        Database.DeleteResult dr = Database.delete(record, true, AccessLevel.USER_MODE);
-        if (!dr.isSuccess()) {
-            throw toException(dr.getErrors());
-        }
-        return JsonApiResponse.noContent();
-    }
-
-    // ---------------------------------------------------------------------
     // Helpers
     // ---------------------------------------------------------------------
 
@@ -231,7 +169,6 @@ public with sharing class JsonApiService {
         JsonApiQueryBuilder builder = new JsonApiQueryBuilder(targetConfig, options);
         // Reuse collection select/sort/paging but scope to the parent via the FK.
         String soql = builder.buildCollectionQuery();
-        // Inject the FK filter ahead of ORDER BY/LIMIT by rebuilding minimally.
         Map<String, Object> binds = builder.binds.clone();
         binds.put('parentId', (Id) parentId);
         soql = injectWhere(soql, def.childForeignKeyField + ' = :parentId');
@@ -293,22 +230,6 @@ public with sharing class JsonApiService {
         return base + '?page[offset]=' + offset + '&page[limit]=' + size;
     }
 
-    private Object parseBodyData(String body) {
-        if (String.isBlank(body)) {
-            throw JsonApiException.badRequest('A request body is required.', JsonApiErrorSource.forPointer('/data'));
-        }
-        Map<String, Object> parsed;
-        try {
-            parsed = (Map<String, Object>) JSON.deserializeUntyped(body);
-        } catch (Exception e) {
-            throw JsonApiException.badRequest('Request body is not valid JSON.', JsonApiErrorSource.forPointer('/data'));
-        }
-        if (!parsed.containsKey('data')) {
-            throw JsonApiException.badRequest('Request document must contain a "data" member.', JsonApiErrorSource.forPointer('/data'));
-        }
-        return parsed.get('data');
-    }
-
     private Boolean isValidId(String id, JsonApiResourceConfig config) {
         try {
             Id parsed = (Id) id;
@@ -316,27 +237,5 @@ public with sharing class JsonApiService {
         } catch (Exception e) {
             return false;
         }
-    }
-
-    private JsonApiException toException(List<Database.Error> errors) {
-        List<JsonApiError> apiErrors = new List<JsonApiError>();
-        for (Database.Error e : errors) {
-            apiErrors.add(new JsonApiError(422, String.valueOf(e.getStatusCode()),
-                'Unprocessable Entity', e.getMessage()));
-        }
-        return new JsonApiException(422, apiErrors);
-    }
-
-    private void requireCollection(List<String> segments) {
-        if (segments.size() != 1) {
-            throw JsonApiException.methodNotAllowed('POST is only supported on a collection (/{type}).');
-        }
-    }
-
-    private String requireResourceId(List<String> segments) {
-        if (segments.size() != 2) {
-            throw JsonApiException.methodNotAllowed('This method requires a path of /{type}/{id}.');
-        }
-        return segments[1];
     }
 }

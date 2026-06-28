@@ -18,7 +18,7 @@ reference, see [`JSON-API-README.md`](../force-app/main/default/classes/JSON-API
 |------|-------------------|
 | **Configuration over code** | New resources are exposed by subclassing `JsonApiResourceConfig` + one `JsonApiResource__mdt` Custom Metadata record — no change to the framework, no new endpoints, parsing, or SOQL. |
 | **Single responsibility per class** | HTTP, routing, parsing, query building, serialization, and persistence are separate, independently testable units. |
-| **Secure by default** | All SOQL/DML run in `AccessLevel.USER_MODE`; identifiers come only from config; values are always bind variables. |
+| **Secure by default** | All SOQL runs in `AccessLevel.USER_MODE`; identifiers come only from config; values are always bind variables. Read-only — no DML. |
 | **Spec compliance** | Document model mirrors the JSON:API object model; content negotiation and error documents follow the spec. |
 | **Transport independence** | The service layer returns a `JsonApiResponse` value object; only `JsonApiRestResource` touches `RestContext`. This keeps the core unit-testable without HTTP. |
 
@@ -37,21 +37,21 @@ reference, see [`JSON-API-README.md`](../force-app/main/default/classes/JSON-API
                   ┌───────────────▼────────────────┐
                   │         JsonApiService           │  routing table + orchestration
                   └──┬───────┬───────┬───────┬──────┘
-                     │       │       │       │
-        ┌────────────▼─┐ ┌───▼────┐ ┌▼─────────┐ ┌▼──────────────┐
-        │ RequestParser│ │ Query  │ │Serializer│ │ Deserializer  │
-        │  →QueryOpts  │ │ Builder│ │ +Include │ │               │
-        └──────┬───────┘ └───┬────┘ │ Resolver │ └───────────────┘
-               │             │      └────┬─────┘
-               │       ┌─────▼──────┐    │
-               │       │  Database  │    │  queryWithBinds / DML (USER_MODE)
-               │       └────────────┘    │
+                     │           │            │
+        ┌────────────▼─┐ ┌───────▼──┐ ┌───────▼───────────┐
+        │ RequestParser│ │  Query   │ │ Serializer        │
+        │  →QueryOpts  │ │  Builder │ │ + IncludeResolver │
+        └──────┬───────┘ └─────┬────┘ └───────┬───────────┘
+               │               │              │
+               │        ┌──────▼─────┐        │
+               │        │  Database  │        │  queryWithBinds (USER_MODE)
+               │        └────────────┘        │
         ┌──────▼─────────────────────────▼──────┐
         │  Registry ← Bootstrap ← ResourceConfig  │  config & metadata
         └─────────────────────────────────────────┘
                                   │
                   ┌───────────────▼────────────────┐
-                  │  Document model (DTOs) ↔ JSON    │
+                  │  Document model (DTOs) → JSON    │
                   └─────────────────────────────────┘
 ```
 
@@ -62,7 +62,7 @@ reference, see [`JSON-API-README.md`](../force-app/main/default/classes/JSON-API
 | HTTP | `JsonApiRestResource` | The only `@RestResource`. Routes verbs, enforces content negotiation, splits the URI, writes the response, renders exceptions as error documents. |
 | Orchestration | `JsonApiService` | Routing table (verb + path shape → operation). Runs queries/DML. Builds the response document including `meta` and pagination `links`. |
 | Orchestration | `JsonApiResponse` | Transport-agnostic `{statusCode, document, headers}` value object. |
-| Config | `JsonApiResourceConfig` | Abstract base mapping a JSON:API `type` → SObject, attributes, relationships, writable fields. |
+| Config | `JsonApiResourceConfig` | Abstract base mapping a JSON:API `type` → SObject, attribute groups and relationships. |
 | Config | `JsonApiRelationshipDef` | Declares a to-one (lookup field) or to-many (child FK) relationship. |
 | Config | `JsonApiRegistry` | Lookups by type and by SObjectType; lazy self-initialization. |
 | Config | `JsonApiBootstrap` | Loads active `JsonApiResource__mdt` records and instantiates each named Apex config via reflection. |
@@ -70,8 +70,7 @@ reference, see [`JSON-API-README.md`](../force-app/main/default/classes/JSON-API
 | Parsing | `JsonApiQueryOptions` | Typed `include` / `fields` / `sort` / `filter` / `page` (+ inner `SortField`). |
 | Data | `JsonApiQueryBuilder` | Generates parameterized SOQL (collection / single / count) + a `binds` map. |
 | Data | `JsonApiIncludeResolver` | Walks `include` paths and bulk-queries related records for the `included` array. |
-| (De)serialization | `JsonApiSerializer` | SObject → `JsonApiResourceObject` (attributes, to-one linkage, links). |
-| (De)serialization | `JsonApiDeserializer` | Request `data` (untyped Map) → SObject, with validation + type coercion. |
+| Serialization | `JsonApiSerializer` | SObject → `JsonApiResourceObject` (attributes, to-one linkage, links). |
 | Model | `JsonApiDocument`, `JsonApiResourceObject`, `JsonApiResourceIdentifier`, `JsonApiRelationship`, `JsonApiError`, `JsonApiErrorSource` | The JSON:API document object model. |
 | Errors | `JsonApiException` | Carries HTTP status + `errors[]`; factory methods per status. |
 | Constants | `JsonApiConstants` | Media type, base path, param names, pagination limits. |
@@ -83,7 +82,7 @@ reference, see [`JSON-API-README.md`](../force-app/main/default/classes/JSON-API
 Tracing `GET /services/apexrest/jsonapi/accounts/001.../?include=parent&fields[accounts]=name`:
 
 1. **Entry** — `JsonApiRestResource.doGet()` → `dispatch('GET', expectsBody=false)`.
-2. **Content negotiation** — `negotiate()` validates `Content-Type` (writes only) and `Accept`. A parameterized JSON:API media type → `406`; a non-JSON:API body content type → `415`.
+2. **Content negotiation** — `negotiate()` validates `Accept`: a JSON:API media type that is parameterized in every instance → `406`.
 3. **Path split** — `segmentsOf(requestURI)` finds the `jsonapi` base token and returns the URL-decoded segments after it: `['accounts', '001...']`.
 4. **Service dispatch** — `JsonApiService.handle('GET', segments, params, null)`:
    - `JsonApiRegistry.forType('accounts')` resolves the config (lazy-initializing the registry via `JsonApiBootstrap` on first call). Unknown type → `404`.
@@ -107,7 +106,6 @@ public override String getType();                          // 'accounts'
 public override Schema.SObjectType getSObjectType();       // Account.SObjectType
 public override Map<String,Map<String,String>> getAttributeGroups(); // group -> (jsonName -> Field)
 public virtual  Map<String,JsonApiRelationshipDef> getRelationships();
-public virtual  Set<String> getWritableAttributes();       // defaults to all mapped
 ```
 
 Derived helpers on the base class (do not override) keep subclasses terse:
@@ -269,13 +267,12 @@ Properties:
 
 ---
 
-## 8. Serialization & deserialization
-
-### Serializer (out)
+## 8. Serialization
 
 `JsonApiSerializer.toResource()` builds a `JsonApiResourceObject`:
 - `id` = `record.get('Id')`, `type` = config type;
-- attributes from the attribute map, filtered by any sparse fieldset for the type;
+- attributes from `resolveAttributeNames(options)` (sparse `fields[]`, else base +
+  `extend` groups);
 - relationships: every relationship gets `self`/`related` links; to-one
   relationships also get `data` linkage from the stored lookup Id (or `null`);
 - a `self` link.
@@ -283,17 +280,7 @@ Properties:
 Output uses `JSON.serialize(doc, true)` — the `suppressApexObjectNulls` flag omits
 absent members, matching JSON:API's "absent vs present" semantics for optional keys.
 
-### Deserializer (in)
-
-`JsonApiDeserializer.toSObject()` works on the **untyped** parsed body
-(`JSON.deserializeUntyped`) for robustness against polymorphic members:
-- `type` is required and must match the endpoint's collection → else `409`
-  (spec-mandated for type mismatch);
-- `id` is required for PATCH (`requireId=true`);
-- each attribute must be **known** (`400`) and **writable** (`403` if read-only);
-  values are coerced to the field type;
-- to-one relationships set the lookup field from the linkage `id`; `data:null`
-  clears it; a to-many relationship or a list-shaped to-one linkage → `400`.
+(The framework is read-only, so there is no inbound deserialization path.)
 
 ---
 
@@ -301,9 +288,9 @@ absent members, matching JSON:API's "absent vs present" semantics for optional k
 
 | Concern | Mechanism |
 |---------|-----------|
-| CRUD / FLS | Every read uses `Database.queryWithBinds(..., AccessLevel.USER_MODE)`; every write uses `Database.insert/update/delete(record, true, AccessLevel.USER_MODE)`. The platform enforces the running user's object and field permissions and strips/【blocks inaccessible fields. |
+| CRUD / FLS | Every read uses `Database.queryWithBinds(..., AccessLevel.USER_MODE)`, so the platform enforces the running user's object and field permissions. |
 | SOQL injection | Identifiers are config-sourced; values are bind variables (see §6). |
-| Mass-assignment | Only attributes in `getWritableAttributes()` may be set; everything else is rejected. |
+| Read-only | No DML path exists; non-GET verbs are rejected with `405`. |
 | Sharing | All worker classes are declared `with sharing`. |
 | Field exposure | Only fields explicitly listed in `getAttributeMap()` are ever selected or returned. |
 
@@ -314,10 +301,9 @@ absent members, matching JSON:API's "absent vs present" semantics for optional k
 ## 10. Error handling
 
 `JsonApiException` carries an HTTP status and a `List<JsonApiError>`, with factory
-methods (`badRequest`, `notFound`, `forbidden`, `conflict`,
-`unsupportedMediaType`, `notAcceptable`, `methodNotAllowed`, `internal`). Thrown
-anywhere in the stack, it is caught once in `JsonApiRestResource.dispatch()` and
-rendered as a spec-compliant document:
+methods (`badRequest`, `notFound`, `notAcceptable`, `methodNotAllowed`,
+`internal`). Thrown anywhere in the stack, it is caught once in
+`JsonApiRestResource.doGet()` and rendered as a spec-compliant document:
 
 ```json
 { "jsonapi": { "version": "1.1" },
@@ -326,19 +312,12 @@ rendered as a spec-compliant document:
                 "source": { "parameter": "sort" } } ] }
 ```
 
-DML failures are converted from `Database.Error[]` into `422 Unprocessable Entity`
-errors, one per row error.
-
 | Condition | Status |
 |-----------|--------|
-| Validation / bad params / malformed body | 400 |
-| Read-only attribute write | 403 |
+| Validation / bad params (bad sort/filter/extend, invalid id) | 400 |
 | Unknown type / id / relationship | 404 |
-| Unsupported method | 405 |
+| Non-GET method | 405 |
 | Parameterized Accept media type | 406 |
-| Type mismatch / id-in-body vs URL mismatch | 409 |
-| Non-JSON:API request body content type | 415 |
-| DML/validation-rule failure | 422 |
 | Uncaught error | 500 |
 
 ---
@@ -385,12 +364,12 @@ Tests exercise the stack at two levels so the core is verifiable without HTTP:
 | Test class | Focus |
 |------------|-------|
 | `JsonApiRequestParserTest` | Param parsing + validation rejections (no DML). |
-| `JsonApiServiceTest` | Full CRUD, include, sparse, sort/filter, pagination, related/linkage endpoints, error statuses — via `JsonApiService.handle()` directly. |
-| `JsonApiRestResourceTest` | HTTP layer: `RestContext` plumbing, content negotiation (415/406), error rendering, `segmentsOf` URI parsing. |
-| `JsonApiCoverageTest` | Config helpers, deserializer validation/coercion branches, nested include, document-model helpers. |
+| `JsonApiServiceTest` | GET operations — collection, single, include, sparse, `extend`, sort/filter, pagination, related/linkage endpoints, error statuses (incl. non-GET → 405) — via `JsonApiService.handle()` directly. |
+| `JsonApiRestResourceTest` | HTTP layer: `RestContext` plumbing, content negotiation (406), error rendering, `segmentsOf` URI parsing. |
+| `JsonApiCoverageTest` | Config helpers, nested include, document-model helpers, CMDT-driven registration. |
 
-**Status:** 53/53 passing, 89% org-wide coverage (clean scratch org), and verified
-live over HTTP against a real org.
+**Status:** all tests passing with healthy org-wide coverage (clean scratch org),
+and verified live over HTTP against a real org.
 
 > The tests insert real `Account`/`Contact` records, so a broken Account/Contact
 > trigger in the target org will fail them — an org problem, not a framework one.
@@ -400,14 +379,13 @@ live over HTTP against a real org.
 
 ## 14. Known limitations
 
+- **Read-only.** Only `GET` is implemented; `POST`/`PATCH`/`DELETE` return `405`.
+  There is no DML or deserialization path. (Adding writes back means restoring a
+  deserializer + create/update/delete handlers.)
 - **to-many linkage** is exposed via relationship endpoints, not inlined into the
   primary `data` (to keep list responses lean). `included` side-loading works for
   to-many.
 - **Filtering is equality-only.** No ranges/`LIKE`/`IN` yet.
-- **No bulk/atomic operations** (JSON:API extensions) and **no writes to
-  relationship endpoints** (`POST/PATCH/DELETE /…/relationships/…`).
-- **Date/Datetime coercion** expects ISO-ish input; exotic offset formats may be
-  rejected with `400`.
 - **OFFSET** is bounded by the platform at 2000 — deep pagination should move to
   keyset/`WHERE Id >` strategies for very large datasets.
 

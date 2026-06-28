@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "Apex JSON:API Framework",
-    "description": "Manual test requests for the Apex JSON:API framework.\n\nSetup: set the `token` collection variable to a fresh access token\n(`sf org display -o jsonapi-org --json` -> result.accessToken). Tokens expire.\n\nNOTE: Account writes fail in the demo org due to a pre-existing broken\nAccountsTrigger (fflib). Reads work; Contact writes work.",
+    "description": "Manual test requests for the Apex JSON:API framework.\n\nSetup: set the `token` collection variable to a fresh access token\n(`sf org display -o jsonapi-org --json` -> result.accessToken). Tokens expire.\n\nNOTE: The API is READ-ONLY (GET only). POST/PATCH/DELETE are not supported\nand return 405 Method Not Allowed.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "auth": {
@@ -533,136 +533,6 @@
       ]
     },
     {
-      "name": "Accounts - Writes (blocked by broken AccountsTrigger)",
-      "item": [
-        {
-          "name": "Create account",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "{{mediaType}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "{{mediaType}}"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/accounts",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "accounts"
-              ]
-            },
-            "body": {
-              "mode": "raw",
-              "raw": "{\n    \"data\": {\n        \"type\": \"accounts\",\n        \"attributes\": {\n            \"name\": \"New Co\",\n            \"industry\": \"Finance\"\n        }\n    }\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          }
-        },
-        {
-          "name": "Create account with parent",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "{{mediaType}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "{{mediaType}}"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/accounts",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "accounts"
-              ]
-            },
-            "body": {
-              "mode": "raw",
-              "raw": "{\n    \"data\": {\n        \"type\": \"accounts\",\n        \"attributes\": {\n            \"name\": \"Child Co\"\n        },\n        \"relationships\": {\n            \"parent\": {\n                \"data\": {\n                    \"type\": \"accounts\",\n                    \"id\": \"{{accountId}}\"\n                }\n            }\n        }\n    }\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          }
-        },
-        {
-          "name": "Update account",
-          "request": {
-            "method": "PATCH",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "{{mediaType}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "{{mediaType}}"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/accounts/{{accountId}}",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "accounts",
-                "{{accountId}}"
-              ]
-            },
-            "body": {
-              "mode": "raw",
-              "raw": "{\n    \"data\": {\n        \"type\": \"accounts\",\n        \"id\": \"{{accountId}}\",\n        \"attributes\": {\n            \"phone\": \"555-0100\"\n        }\n    }\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          }
-        },
-        {
-          "name": "Delete account",
-          "request": {
-            "method": "DELETE",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "{{mediaType}}"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/accounts/{{accountId}}",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "accounts",
-                "{{accountId}}"
-              ]
-            }
-          }
-        }
-      ]
-    },
-    {
       "name": "Contacts - Reads",
       "item": [
         {
@@ -982,136 +852,6 @@
       ]
     },
     {
-      "name": "Contacts - Writes",
-      "item": [
-        {
-          "name": "Create contact",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "{{mediaType}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "{{mediaType}}"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/contacts",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "contacts"
-              ]
-            },
-            "body": {
-              "mode": "raw",
-              "raw": "{\n    \"data\": {\n        \"type\": \"contacts\",\n        \"attributes\": {\n            \"firstName\": \"Ann\",\n            \"lastName\": \"Lee\",\n            \"email\": \"ann@example.com\"\n        }\n    }\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          }
-        },
-        {
-          "name": "Create contact with account",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "{{mediaType}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "{{mediaType}}"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/contacts",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "contacts"
-              ]
-            },
-            "body": {
-              "mode": "raw",
-              "raw": "{\n    \"data\": {\n        \"type\": \"contacts\",\n        \"attributes\": {\n            \"lastName\": \"Lee\"\n        },\n        \"relationships\": {\n            \"account\": {\n                \"data\": {\n                    \"type\": \"accounts\",\n                    \"id\": \"{{accountId}}\"\n                }\n            }\n        }\n    }\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          }
-        },
-        {
-          "name": "Update contact",
-          "request": {
-            "method": "PATCH",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "{{mediaType}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "{{mediaType}}"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/contacts/{{contactId}}",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "contacts",
-                "{{contactId}}"
-              ]
-            },
-            "body": {
-              "mode": "raw",
-              "raw": "{\n    \"data\": {\n        \"type\": \"contacts\",\n        \"id\": \"{{contactId}}\",\n        \"attributes\": {\n            \"title\": \"VP\"\n        }\n    }\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            }
-          }
-        },
-        {
-          "name": "Delete contact",
-          "request": {
-            "method": "DELETE",
-            "header": [
-              {
-                "key": "Accept",
-                "value": "{{mediaType}}"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/contacts/{{contactId}}",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "contacts",
-                "{{contactId}}"
-              ]
-            }
-          }
-        }
-      ]
-    },
-    {
       "name": "Error cases",
       "item": [
         {
@@ -1239,17 +979,13 @@
           }
         },
         {
-          "name": "415 - wrong Content-Type",
+          "name": "405 - write method not allowed (read-only)",
           "request": {
             "method": "POST",
             "header": [
               {
                 "key": "Accept",
                 "value": "{{mediaType}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "text/plain"
               }
             ],
             "url": {
@@ -1260,15 +996,6 @@
               "path": [
                 "accounts"
               ]
-            },
-            "body": {
-              "mode": "raw",
-              "raw": "{\n    \"data\": {\n        \"type\": \"accounts\",\n        \"attributes\": {\n            \"name\": \"x\"\n        }\n    }\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
             }
           }
         },

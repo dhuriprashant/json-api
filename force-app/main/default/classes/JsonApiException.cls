@@ -45,21 +45,6 @@ public class JsonApiException extends Exception {
             new JsonApiError(404, 'NOT_FOUND', 'Resource Not Found', detail));
     }
 
-    public static JsonApiException forbidden(String detail) {
-        return new JsonApiException(403,
-            new JsonApiError(403, 'FORBIDDEN', 'Forbidden', detail));
-    }
-
-    public static JsonApiException conflict(String detail) {
-        return new JsonApiException(409,
-            new JsonApiError(409, 'CONFLICT', 'Conflict', detail));
-    }
-
-    public static JsonApiException unsupportedMediaType(String detail) {
-        return new JsonApiException(415,
-            new JsonApiError(415, 'UNSUPPORTED_MEDIA_TYPE', 'Unsupported Media Type', detail));
-    }
-
     public static JsonApiException notAcceptable(String detail) {
         return new JsonApiException(406,
             new JsonApiError(406, 'NOT_ACCEPTABLE', 'Not Acceptable', detail));

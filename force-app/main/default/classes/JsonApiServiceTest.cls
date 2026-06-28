@@ -20,8 +20,10 @@ private class JsonApiServiceTest {
         return [SELECT Id FROM Account WHERE Name = 'Acme' LIMIT 1];
     }
 
+    // 4th arg (body) is ignored — the API is read-only — but kept so existing
+    // GET call sites need no change.
     private static JsonApiResponse handle(String method, List<String> segments, Map<String, String> params, String body) {
-        return new JsonApiService().handle(method, segments, params, body);
+        return new JsonApiService().handle(method, segments, params);
     }
 
     @IsTest
@@ -123,71 +125,6 @@ private class JsonApiServiceTest {
     }
 
     @IsTest
-    static void createsResource() {
-        String body = JSON.serialize(new Map<String, Object>{
-            'data' => new Map<String, Object>{
-                'type' => 'accounts',
-                'attributes' => new Map<String, Object>{ 'name' => 'New Co', 'industry' => 'Finance' }
-            }
-        });
-
-        Test.startTest();
-        JsonApiResponse r = handle('POST', new List<String>{ 'accounts' }, null, body);
-        Test.stopTest();
-
-        System.assertEquals(201, r.statusCode);
-        System.assert(r.headers.containsKey('Location'));
-        JsonApiResourceObject obj = (JsonApiResourceObject) r.document.data;
-        System.assertNotEquals(null, obj.id);
-        System.assertEquals('New Co', obj.attributes.get('name'));
-        System.assertEquals(1, [SELECT COUNT() FROM Account WHERE Name = 'New Co']);
-    }
-
-    @IsTest
-    static void createsResourceWithRelationship() {
-        Id parentId = [SELECT Id FROM Account WHERE Name = 'Parent Co' LIMIT 1].Id;
-        String body = JSON.serialize(new Map<String, Object>{
-            'data' => new Map<String, Object>{
-                'type' => 'accounts',
-                'attributes' => new Map<String, Object>{ 'name' => 'Child Co' },
-                'relationships' => new Map<String, Object>{
-                    'parent' => new Map<String, Object>{
-                        'data' => new Map<String, Object>{ 'type' => 'accounts', 'id' => parentId }
-                    }
-                }
-            }
-        });
-
-        JsonApiResponse r = handle('POST', new List<String>{ 'accounts' }, null, body);
-        System.assertEquals(201, r.statusCode);
-        Account child = [SELECT ParentId FROM Account WHERE Name = 'Child Co' LIMIT 1];
-        System.assertEquals(parentId, child.ParentId);
-    }
-
-    @IsTest
-    static void updatesResource() {
-        Id id = acme().Id;
-        String body = JSON.serialize(new Map<String, Object>{
-            'data' => new Map<String, Object>{
-                'type' => 'accounts', 'id' => id,
-                'attributes' => new Map<String, Object>{ 'phone' => '555-9999' }
-            }
-        });
-
-        JsonApiResponse r = handle('PATCH', new List<String>{ 'accounts', id }, null, body);
-        System.assertEquals(200, r.statusCode);
-        System.assertEquals('555-9999', [SELECT Phone FROM Account WHERE Id = :id].Phone);
-    }
-
-    @IsTest
-    static void deletesResource() {
-        Id id = acme().Id;
-        JsonApiResponse r = handle('DELETE', new List<String>{ 'accounts', id }, null, null);
-        System.assertEquals(204, r.statusCode);
-        System.assertEquals(0, [SELECT COUNT() FROM Account WHERE Id = :id]);
-    }
-
-    @IsTest
     static void getsRelatedToManyCollection() {
         Id id = acme().Id;
         JsonApiResponse r = handle('GET', new List<String>{ 'accounts', id, 'contacts' },
@@ -234,42 +171,16 @@ private class JsonApiServiceTest {
     }
 
     @IsTest
-    static void createWithUnknownAttributeIsBadRequest() {
-        String body = JSON.serialize(new Map<String, Object>{
-            'data' => new Map<String, Object>{
-                'type' => 'accounts',
-                'attributes' => new Map<String, Object>{ 'bogus' => 'x' }
+    static void nonGetMethodsAreReadOnly() {
+        // The API is read-only: every non-GET verb must be rejected with 405.
+        Id id = acme().Id;
+        for (String verb : new List<String>{ 'POST', 'PATCH', 'DELETE', 'PUT', 'OPTIONS' }) {
+            try {
+                handle(verb, new List<String>{ 'accounts', id }, new Map<String, String>(), null);
+                System.assert(false, verb + ' should be rejected');
+            } catch (JsonApiException e) {
+                System.assertEquals(405, e.httpStatus, verb + ' -> 405');
             }
-        });
-        try {
-            handle('POST', new List<String>{ 'accounts' }, null, body);
-            System.assert(false, 'expected exception');
-        } catch (JsonApiException e) {
-            System.assertEquals(400, e.httpStatus);
-        }
-    }
-
-    @IsTest
-    static void typeMismatchOnCreateIsConflict() {
-        String body = JSON.serialize(new Map<String, Object>{
-            'data' => new Map<String, Object>{ 'type' => 'contacts',
-                'attributes' => new Map<String, Object>{ 'name' => 'X' } }
-        });
-        try {
-            handle('POST', new List<String>{ 'accounts' }, null, body);
-            System.assert(false, 'expected exception');
-        } catch (JsonApiException e) {
-            System.assertEquals(409, e.httpStatus);
-        }
-    }
-
-    @IsTest
-    static void unsupportedMethodIsNotAllowed() {
-        try {
-            handle('OPTIONS', new List<String>{ 'accounts' }, new Map<String, String>(), null);
-            System.assert(false, 'expected exception');
-        } catch (JsonApiException e) {
-            System.assertEquals(405, e.httpStatus);
         }
     }
 }

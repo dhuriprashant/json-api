@@ -1,8 +1,11 @@
 /**
  * The HTTP entry point for the framework. Exposes every registered resource
  * under /services/apexrest/jsonapi/* and delegates all logic to
- * {@link JsonApiService}. This class only deals with HTTP concerns: routing the
- * verb, content negotiation, writing the response and rendering errors.
+ * {@link JsonApiService}. This class only deals with HTTP concerns: content
+ * negotiation, writing the response and rendering errors.
+ *
+ * The API is read-only: only GET is exposed. Other HTTP methods are rejected by
+ * the platform with 405.
  *
  * @see https://jsonapi.org/format/#content-negotiation
  */
@@ -11,38 +14,14 @@ global with sharing class JsonApiRestResource {
 
     @HttpGet
     global static void doGet() {
-        dispatch('GET', false);
-    }
-
-    @HttpPost
-    global static void doPost() {
-        dispatch('POST', true);
-    }
-
-    @HttpPatch
-    global static void doPatch() {
-        dispatch('PATCH', true);
-    }
-
-    @HttpDelete
-    global static void doDelete() {
-        dispatch('DELETE', false);
-    }
-
-    // ---------------------------------------------------------------------
-
-    private static void dispatch(String method, Boolean expectsBody) {
         RestRequest req = RestContext.request;
         RestResponse res = RestContext.response;
         res.addHeader('Content-Type', JsonApiConstants.MEDIA_TYPE);
 
         try {
-            negotiate(req, expectsBody);
-
-            String body = req.requestBody == null ? null : req.requestBody.toString();
+            negotiate(req);
             JsonApiResponse result = new JsonApiService().handle(
-                method, segmentsOf(req.requestURI), req.params, body);
-
+                'GET', segmentsOf(req.requestURI), req.params);
             writeResponse(res, result);
         } catch (JsonApiException e) {
             writeError(res, e.httpStatus, e.errors);
@@ -53,23 +32,15 @@ global with sharing class JsonApiRestResource {
         }
     }
 
+    // ---------------------------------------------------------------------
+
     /**
-     * Enforces JSON:API content negotiation: a request body must be sent as the
-     * JSON:API media type with no parameters, and the Accept header (if it names
-     * the media type) must not parameterize every instance.
+     * Enforces JSON:API content negotiation: if the Accept header names the
+     * JSON:API media type, at least one instance must be unparameterized.
      */
-    private static void negotiate(RestRequest req, Boolean expectsBody) {
-        if (expectsBody) {
-            String contentType = header(req, 'Content-Type');
-            if (String.isNotBlank(contentType) &&
-                !contentType.trim().equalsIgnoreCase(JsonApiConstants.MEDIA_TYPE)) {
-                throw JsonApiException.unsupportedMediaType(
-                    'Content-Type must be "' + JsonApiConstants.MEDIA_TYPE + '".');
-            }
-        }
+    private static void negotiate(RestRequest req) {
         String accept = header(req, 'Accept');
         if (String.isNotBlank(accept) && accept.contains(JsonApiConstants.MEDIA_TYPE)) {
-            // Reject only when every JSON:API media-type instance carries params.
             Boolean hasUnparameterized = false;
             for (String range : accept.split(',')) {
                 if (range.trim().equalsIgnoreCase(JsonApiConstants.MEDIA_TYPE)) {

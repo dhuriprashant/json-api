@@ -18,7 +18,9 @@ security is enforced by the platform for the running user.
 
 ## Status
 
-- ✅ **53/53 Apex tests passing**, 89% org-wide coverage (clean scratch org).
+- ⚠️ **Read-only:** this is a GET-only framework. `POST`/`PATCH`/`DELETE` are not
+  implemented and are rejected with `405 Method Not Allowed`.
+- ✅ **Apex tests passing** with healthy org-wide coverage (clean scratch org).
 - ✅ **Confirmed live** against a real org — sparse fieldsets, pagination,
   `include` compound documents, relationship linkage and error responses all
   verified end-to-end over HTTP.
@@ -36,9 +38,9 @@ Everything is served under `/services/apexrest/jsonapi`.
 | `GET`    | `/{type}/{id}`                             | Fetch one resource           |
 | `GET`    | `/{type}/{id}/{relationship}`              | Fetch related resource(s)    |
 | `GET`    | `/{type}/{id}/relationships/{relationship}`| Fetch relationship linkage   |
-| `POST`   | `/{type}`                                  | Create                       |
-| `PATCH`  | `/{type}/{id}`                             | Update                       |
-| `DELETE` | `/{type}/{id}`                             | Delete                       |
+
+`POST`, `PATCH` and `DELETE` are not supported (read-only framework) and return
+`405 Method Not Allowed`.
 
 ### Supported query parameters
 
@@ -89,17 +91,6 @@ GET /services/apexrest/jsonapi/accounts/001.../?include=parent
   ]
 }
 ```
-
-**Create:**
-
-```
-POST /services/apexrest/jsonapi/accounts
-Content-Type: application/vnd.api+json
-
-{ "data": { "type": "accounts", "attributes": { "name": "New Co", "industry": "Finance" } } }
-```
-
-Returns `201 Created` with a `Location` header and the created resource.
 
 **Errors** are returned as a JSON:API error document with the matching HTTP status:
 
@@ -162,10 +153,6 @@ public with sharing class OpportunityResourceConfig extends JsonApiResourceConfi
             'account' => JsonApiRelationshipDef.toOne('account', 'accounts', 'AccountId')
         };
     }
-    // Optional: lock down which attributes may be written.
-    public override Set<String> getWritableAttributes() {
-        return new Set<String>{ 'name', 'stage', 'amount', 'closeDate' };
-    }
 }
 ```
 
@@ -201,7 +188,7 @@ an endpoint without deleting the record.
 | Configuration    | `JsonApiResourceConfig`, `JsonApiRelationshipDef`, `JsonApiRegistry`, `JsonApiBootstrap` |
 | Request parsing  | `JsonApiRequestParser`, `JsonApiQueryOptions`                         |
 | Data access      | `JsonApiQueryBuilder`, `JsonApiIncludeResolver`                       |
-| (De)serialization| `JsonApiSerializer`, `JsonApiDeserializer`                            |
+| Serialization    | `JsonApiSerializer`                                                    |
 | Document model   | `JsonApiDocument`, `JsonApiResourceObject`, `JsonApiResourceIdentifier`, `JsonApiRelationship`, `JsonApiError`, `JsonApiErrorSource` |
 | Errors           | `JsonApiException`                                                     |
 | Constants        | `JsonApiConstants`                                                     |
@@ -211,9 +198,10 @@ an endpoint without deleting the record.
 - All SOQL/DML use `USER_MODE`, enforcing CRUD/FLS automatically.
 - Object and field names in generated SOQL come only from configs, never from
   user input; all filter values are passed as bind variables — no SOQL injection.
-- Only attributes in `getWritableAttributes()` can be set on create/update.
+- Only fields declared in a config's attribute groups are ever queried or returned.
 
 ### Known limitations / extension points
+- **Read-only:** only `GET` is implemented. `POST`/`PATCH`/`DELETE` return `405`.
 - `include` populates the top-level `included` array and to-one linkage; to-many
   linkage inside primary `data` is exposed via the relationship endpoints rather
   than inlined.

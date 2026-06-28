@@ -43,17 +43,6 @@ private class JsonApiRestResourceTest {
     }
 
     @IsTest
-    static void wrongContentTypeIsUnsupportedMediaType() {
-        RestRequest req = newRequest('POST', '/services/apexrest/jsonapi/accounts');
-        req.addHeader('Content-Type', 'text/plain');
-        req.requestBody = Blob.valueOf('{"data":{}}');
-
-        JsonApiRestResource.doPost();
-
-        System.assertEquals(415, RestContext.response.statusCode);
-    }
-
-    @IsTest
     static void parameterizedAcceptIsNotAcceptable() {
         RestRequest req = newRequest('GET', '/services/apexrest/jsonapi/accounts');
         req.addHeader('Accept', JsonApiConstants.MEDIA_TYPE + ';charset=utf-8');
@@ -61,26 +50,6 @@ private class JsonApiRestResourceTest {
         JsonApiRestResource.doGet();
 
         System.assertEquals(406, RestContext.response.statusCode);
-    }
-
-    @IsTest
-    static void postCreatesViaHttpLayer() {
-        RestRequest req = newRequest('POST', '/services/apexrest/jsonapi/accounts');
-        req.addHeader('Content-Type', JsonApiConstants.MEDIA_TYPE);
-        req.requestBody = Blob.valueOf(JSON.serialize(new Map<String, Object>{
-            'data' => new Map<String, Object>{
-                'type' => 'accounts',
-                'attributes' => new Map<String, Object>{ 'name' => 'Via HTTP' }
-            }
-        }));
-
-        Test.startTest();
-        JsonApiRestResource.doPost();
-        Test.stopTest();
-
-        System.assertEquals(201, RestContext.response.statusCode);
-        System.assert(RestContext.response.headers.containsKey('Location'));
-        System.assertEquals(1, [SELECT COUNT() FROM Account WHERE Name = 'Via HTTP']);
     }
 
     @IsTest

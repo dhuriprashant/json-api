@@ -12,8 +12,8 @@
 # 2. Set @accountId / @contactId to real record Ids from your org (e.g. from the
 #    "List accounts" / "List contacts" responses below).
 #
-# NOTE: Account writes (POST/PATCH/DELETE) currently fail in this org because of a
-#       pre-existing broken AccountsTrigger (fflib). Reads work; Contact writes work.
+# NOTE: The API is READ-ONLY (GET only). POST/PATCH/DELETE are not supported
+#       and return 405 Method Not Allowed.
 ###############################################################################
 
 @instanceUrl = https://YOUR_DOMAIN.my.salesforce.com
@@ -120,59 +120,6 @@ Accept: {{mediaType}}
 
 
 ###############################################################################
-# ACCOUNTS — writes  (⚠ blocked in this org by the broken AccountsTrigger)
-###############################################################################
-
-### Create account
-POST {{baseUrl}}/accounts
-Authorization: Bearer {{token}}
-Accept: {{mediaType}}
-Content-Type: {{mediaType}}
-
-{
-  "data": {
-    "type": "accounts",
-    "attributes": { "name": "New Co", "industry": "Finance" }
-  }
-}
-
-### Create account with parent relationship
-POST {{baseUrl}}/accounts
-Authorization: Bearer {{token}}
-Accept: {{mediaType}}
-Content-Type: {{mediaType}}
-
-{
-  "data": {
-    "type": "accounts",
-    "attributes": { "name": "Child Co" },
-    "relationships": {
-      "parent": { "data": { "type": "accounts", "id": "{{accountId}}" } }
-    }
-  }
-}
-
-### Update account
-PATCH {{baseUrl}}/accounts/{{accountId}}
-Authorization: Bearer {{token}}
-Accept: {{mediaType}}
-Content-Type: {{mediaType}}
-
-{
-  "data": {
-    "type": "accounts",
-    "id": "{{accountId}}",
-    "attributes": { "phone": "555-0100" }
-  }
-}
-
-### Delete account
-DELETE {{baseUrl}}/accounts/{{accountId}}
-Authorization: Bearer {{token}}
-Accept: {{mediaType}}
-
-
-###############################################################################
 # CONTACTS — reads
 ###############################################################################
 
@@ -238,59 +185,6 @@ Accept: {{mediaType}}
 
 
 ###############################################################################
-# CONTACTS — writes  (these work; Contact has no broken trigger)
-###############################################################################
-
-### Create contact
-POST {{baseUrl}}/contacts
-Authorization: Bearer {{token}}
-Accept: {{mediaType}}
-Content-Type: {{mediaType}}
-
-{
-  "data": {
-    "type": "contacts",
-    "attributes": { "firstName": "Ann", "lastName": "Lee", "email": "ann@example.com" }
-  }
-}
-
-### Create contact with account relationship
-POST {{baseUrl}}/contacts
-Authorization: Bearer {{token}}
-Accept: {{mediaType}}
-Content-Type: {{mediaType}}
-
-{
-  "data": {
-    "type": "contacts",
-    "attributes": { "lastName": "Lee" },
-    "relationships": {
-      "account": { "data": { "type": "accounts", "id": "{{accountId}}" } }
-    }
-  }
-}
-
-### Update contact
-PATCH {{baseUrl}}/contacts/{{contactId}}
-Authorization: Bearer {{token}}
-Accept: {{mediaType}}
-Content-Type: {{mediaType}}
-
-{
-  "data": {
-    "type": "contacts",
-    "id": "{{contactId}}",
-    "attributes": { "title": "VP" }
-  }
-}
-
-### Delete contact
-DELETE {{baseUrl}}/contacts/{{contactId}}
-Authorization: Bearer {{token}}
-Accept: {{mediaType}}
-
-
-###############################################################################
 # ERROR CASES
 ###############################################################################
 
@@ -319,13 +213,10 @@ GET {{baseUrl}}/accounts?filter[bogus]=x
 Authorization: Bearer {{token}}
 Accept: {{mediaType}}
 
-### 415 — wrong Content-Type on write
+### 405 — write method not allowed (read-only API)
 POST {{baseUrl}}/accounts
 Authorization: Bearer {{token}}
 Accept: {{mediaType}}
-Content-Type: text/plain
-
-{ "data": { "type": "accounts", "attributes": { "name": "x" } } }
 
 ### 406 — parameterized Accept media type
 GET {{baseUrl}}/accounts

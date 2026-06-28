@@ -41,15 +41,6 @@ public abstract class JsonApiResourceConfig {
         return new Map<String, JsonApiRelationshipDef>();
     }
 
-    /**
-     * Attribute names that may be set on create/update. Defaults to every
-     * mapped attribute (across all groups); override to exclude
-     * formula/rollup/system fields.
-     */
-    public virtual Set<String> getWritableAttributes() {
-        return getAttributeMap().keySet().clone();
-    }
-
     // ---------------------------------------------------------------------
     // Derived helpers (do not override)
     // ---------------------------------------------------------------------

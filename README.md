@@ -17,7 +17,9 @@ all enforced under the running user's CRUD/FLS via `AccessLevel.USER_MODE`.
 
 ## Status
 
-- ✅ **Validated:** 53/53 Apex tests passing, 89% org-wide coverage (clean scratch org).
+- ⚠️ **Read-only:** GET-only framework; `POST`/`PATCH`/`DELETE` are not supported
+  and return `405`.
+- ✅ **Validated:** Apex tests passing with healthy org-wide coverage (clean scratch org).
 - ✅ **Deployed & confirmed live** — GET (sparse fieldsets, pagination, `include`
   compound documents) and error responses verified against a real org.
 
@@ -27,7 +29,7 @@ all enforced under the running user's CRUD/FLS via `AccessLevel.USER_MODE`.
 
 | Capability            | Example                                                        |
 |-----------------------|----------------------------------------------------------------|
-| CRUD                  | `GET/POST/PATCH/DELETE /{type}[/{id}]`                         |
+| Read (GET)            | `GET /{type}` and `GET /{type}/{id}` _(writes gated off for now → 405)_ |
 | Relationships         | `GET /{type}/{id}/{relationship}` and `.../relationships/{rel}`|
 | Compound documents    | `?include=parent,contacts` (supports nested, e.g. `contacts.account`) |
 | Attribute groups      | `?extend=financials,contactInfo` (opt into extra groups beyond `base`) |
