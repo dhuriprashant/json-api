@@ -152,4 +152,42 @@ private class JsonApiCoverageTest {
         System.assert(errDoc.toJson().contains('"sort"'));
         System.assertEquals('sort', err.source.parameter);
     }
+
+    // ---- CMDT-driven registration (JsonApiBootstrap) ----
+
+    @IsTest
+    static void bootstrapRegistersConfigsFromCmdt() {
+        JsonApiRegistry.reset();
+        System.assert(JsonApiRegistry.isRegistered('accounts'), 'accounts registered from CMDT');
+        System.assert(JsonApiRegistry.isRegistered('contacts'), 'contacts registered from CMDT');
+    }
+
+    @IsTest
+    static void bootstrapRejectsUnknownApexClass() {
+        JsonApiBootstrap.configOverride = new List<JsonApiResource__mdt>{
+            new JsonApiResource__mdt(DeveloperName = 'Bad', Apex_Class__c = 'NoSuchClass__X', Is_Active__c = true)
+        };
+        JsonApiRegistry.reset();
+        try {
+            JsonApiRegistry.forType('accounts');
+            System.assert(false, 'expected configuration exception');
+        } catch (JsonApiException e) {
+            System.assertEquals(500, e.httpStatus);
+        }
+    }
+
+    @IsTest
+    static void bootstrapRejectsNonConfigClass() {
+        // A real class that exists but does not extend JsonApiResourceConfig.
+        JsonApiBootstrap.configOverride = new List<JsonApiResource__mdt>{
+            new JsonApiResource__mdt(DeveloperName = 'Bad', Apex_Class__c = 'JsonApiConstants', Is_Active__c = true)
+        };
+        JsonApiRegistry.reset();
+        try {
+            JsonApiRegistry.forType('accounts');
+            System.assert(false, 'expected configuration exception');
+        } catch (JsonApiException e) {
+            System.assertEquals(500, e.httpStatus);
+        }
+    }
 }

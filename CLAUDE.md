@@ -52,7 +52,7 @@ A request walks one path through the layers; understanding this sequence is the 
 The whole framework is driven by `JsonApiResourceConfig` subclasses. To expose a new SObject:
 
 1. Subclass `JsonApiResourceConfig`. Three abstract methods are required: `getType()` (the JSON:API type string), `getSObjectType()`, and `getAttributeMap()` (JSON:API attribute name → SObject field API name; **do not** map `id` here). Optionally override `getRelationships()` and `getWritableAttributes()` (defaults to all mapped attributes — override to exclude formula/rollup/system fields). See `AccountResourceConfig` / `ContactResourceConfig`.
-2. Add one line to `JsonApiBootstrap.registerAll()`: `JsonApiRegistry.register(new YourResourceConfig());`
+2. Add a `JsonApiResource__mdt` Custom Metadata record whose `Apex_Class__c` is your config class name and `Is_Active__c` is checked (see `customMetadata/JsonApiResource.Accounts.md-meta.xml`). `JsonApiBootstrap.registerAll()` loads active records and instantiates each via `Type.forName().newInstance()` — no Apex change to the framework is needed.
 
 Relationships are declared via `JsonApiRelationshipDef.toOne(name, targetType, lookupField)` (lookup field on this object) or `JsonApiRelationshipDef.toMany(name, targetType, childForeignKeyField)` (FK field on the child object).
 

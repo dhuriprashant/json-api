@@ -10,6 +10,10 @@ compound documents (`include`), content negotiation and spec-compliant errors.
 All data access runs in `AccessLevel.USER_MODE`, so object- and field-level
 security is enforced by the platform for the running user.
 
+> 🏗️ For internals — request lifecycle, SOQL generation, include resolution
+> algorithm, security model, extension points — see the
+> [technical design doc](../../../../docs/TECHNICAL.md).
+
 ---
 
 ## Status
@@ -131,13 +135,26 @@ public with sharing class OpportunityResourceConfig extends JsonApiResourceConfi
 }
 ```
 
-2. Register it in `JsonApiBootstrap.registerAll()`:
+2. Register it by adding a **`JSON:API Resource`** Custom Metadata record (no Apex
+   change needed). Either in Setup → *Custom Metadata Types* → *JSON:API Resource*
+   → *Manage Records*, or by deploying a file:
 
-```apex
-JsonApiRegistry.register(new OpportunityResourceConfig());
-```
+   `force-app/main/default/customMetadata/JsonApiResource.Opportunities.md-meta.xml`
+   ```xml
+   <?xml version="1.0" encoding="UTF-8"?>
+   <CustomMetadata xmlns="http://soap.sforce.com/2006/04/metadata"
+                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+       <label>Opportunities</label>
+       <protected>false</protected>
+       <values><field>Apex_Class__c</field><value xsi:type="xsd:string">OpportunityResourceConfig</value></values>
+       <values><field>Is_Active__c</field><value xsi:type="xsd:boolean">true</value></values>
+   </CustomMetadata>
+   ```
 
 That's it — the new type is live at `/services/apexrest/jsonapi/opportunities`.
+`JsonApiBootstrap` reads all active `JsonApiResource__mdt` records on first use and
+instantiates each `Apex_Class__c` via reflection. Uncheck `Is_Active__c` to disable
+an endpoint without deleting the record.
 
 ---
 

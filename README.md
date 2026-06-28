@@ -8,8 +8,10 @@ framework handles routing, CRUD, sparse fieldsets, sorting, filtering, paginatio
 compound documents (`include`), content negotiation, and spec-compliant errors —
 all enforced under the running user's CRUD/FLS via `AccessLevel.USER_MODE`.
 
-> 📖 Full reference docs (endpoints, query params, examples, architecture, how to
-> add a resource) live in [`force-app/main/default/classes/JSON-API-README.md`](force-app/main/default/classes/JSON-API-README.md).
+> 📖 **Usage reference** (endpoints, query params, examples, how to add a resource):
+> [`force-app/main/default/classes/JSON-API-README.md`](force-app/main/default/classes/JSON-API-README.md)
+> 🏗️ **Technical design** (architecture, request lifecycle, internals, security):
+> [`docs/TECHNICAL.md`](docs/TECHNICAL.md)
 
 ---
 
@@ -97,4 +99,5 @@ That's it — the new type is live. Full walkthrough in the
 
 - `sfdx-project.json` — Salesforce DX configuration
 - `config/project-scratch-def.json` — scratch org definition
+- `docs/TECHNICAL.md` — detailed technical/architecture documentation
 - `force-app/main/default/classes/` — the framework (23 classes) + tests + docs
