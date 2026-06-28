@@ -81,19 +81,76 @@ reference, see [`JSON-API-README.md`](../force-app/main/default/classes/JSON-API
 
 Tracing `GET /services/apexrest/jsonapi/accounts/001.../?include=parent&fields[accounts]=name`:
 
-1. **Entry** — `JsonApiRestResource.doGet()` → `dispatch('GET', expectsBody=false)`.
+1. **Entry** — `JsonApiRestResource.doGet()` (the only HTTP handler) runs the request directly.
 2. **Content negotiation** — `negotiate()` validates `Accept`: a JSON:API media type that is parameterized in every instance → `406`.
 3. **Path split** — `segmentsOf(requestURI)` finds the `jsonapi` base token and returns the URL-decoded segments after it: `['accounts', '001...']`.
-4. **Service dispatch** — `JsonApiService.handle('GET', segments, params, null)`:
+4. **Service dispatch** — `JsonApiService.handle('GET', segments, params)`:
+   - any non-GET verb → `405`;
    - `JsonApiRegistry.forType('accounts')` resolves the config (lazy-initializing the registry via `JsonApiBootstrap` on first call). Unknown type → `404`.
-   - `switch on method` → `handleGet()`.
+   - routes by path shape → `handleGet()`.
 5. **Parse query** — `JsonApiRequestParser.parse(params, config)` produces `JsonApiQueryOptions`. Unknown sort/filter/include names are rejected with `400` here, before any SOQL exists.
 6. **Build & run SOQL** — for a single record, `JsonApiQueryBuilder.buildSingleQuery(id)` produces `SELECT Id, Name, ParentId FROM Account WHERE Id = :recordId LIMIT 1` with `binds = {recordId}`. Executed via `Database.queryWithBinds(..., AccessLevel.USER_MODE)`.
 7. **Serialize** — `JsonApiSerializer.toResource()` maps fields → attributes (honoring sparse `fields[accounts]=name`), emits to-one relationship linkage from the `ParentId` value, and adds a `self` link.
 8. **Resolve includes** — `JsonApiIncludeResolver.resolve()` collects `ParentId` values, bulk-queries the parent Accounts, serializes them into `included` (deduplicated by `type:id`).
 9. **Assemble** — `JsonApiDocument.ofData(resource)` (stamped with `jsonapi.version`), `included` attached.
 10. **Write response** — `writeResponse()` sets the status code, `Content-Type: application/vnd.api+json`, any extra headers, and the serialized body.
-11. **Errors** — any `JsonApiException` thrown anywhere in 2–10 is caught in `dispatch()` and rendered as a JSON:API error document with the carried HTTP status; any other exception becomes a `500` error document.
+11. **Errors** — any `JsonApiException` thrown anywhere in 2–10 is caught in `doGet()` and rendered as a JSON:API error document with the carried HTTP status; any other exception becomes a `500` error document.
+
+### Sequence diagram
+
+A `GET /jsonapi/accounts/{id}?include=parent` request through the layers:
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Client
+    participant REST as JsonApiRestResource
+    participant Svc as JsonApiService
+    participant Reg as JsonApiRegistry
+    participant Parser as JsonApiRequestParser
+    participant Builder as JsonApiQueryBuilder
+    participant DB as Database·USER_MODE
+    participant Ser as JsonApiSerializer
+    participant Inc as JsonApiIncludeResolver
+
+    Client->>REST: GET /accounts/{id}?include=parent
+    activate REST
+    REST->>REST: negotiate(Accept)
+    REST->>REST: segmentsOf(uri) → [accounts, id]
+    REST->>Svc: handle("GET", segments, params)
+    activate Svc
+
+    Svc->>Reg: forType("accounts")
+    Reg-->>Svc: config (404 if unknown)
+    Svc->>Parser: parse(params, config)
+    Parser-->>Svc: JsonApiQueryOptions (400 if bad sort/filter/include/extend)
+
+    Svc->>Builder: buildSingleQuery(id)
+    Builder-->>Svc: soql + binds
+    Svc->>DB: queryWithBinds(soql, binds)
+    DB-->>Svc: SObject (404 if none)
+    Svc->>Ser: toResource(record, config, options)
+    Ser-->>Svc: JsonApiResourceObject (data)
+
+    opt include requested
+        Svc->>Inc: resolve(records, config, options)
+        Inc->>DB: queryWithBinds(related WHERE Id IN :ids)
+        DB-->>Inc: related SObjects
+        Inc->>Ser: toResource(...) per related record
+        Inc-->>Svc: included[] (deduped by type:id)
+    end
+
+    Svc-->>REST: JsonApiResponse(200, document)
+    deactivate Svc
+    REST-->>Client: 200 application/vnd.api+json
+    deactivate REST
+
+    Note over REST: Any JsonApiException → error document<br/>with its HTTP status (400/404/405/406);<br/>anything else → 500
+```
+
+For a **collection** request the single-record query is replaced by
+`buildCollectionQuery()` + `buildCountQuery()` (the latter feeds `meta.total` and
+the pagination `links`); everything else is identical.
 
 ---
 
