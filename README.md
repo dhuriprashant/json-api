@@ -83,6 +83,20 @@ curl "$INSTANCE_URL/services/apexrest/jsonapi/accounts?fields[accounts]=name,ind
 }
 ```
 
+### Manual testing
+
+Ready-to-run request collections covering every endpoint and option for both
+example resources (reads, writes, includes, `extend`, pagination, error cases):
+
+- [`docs/manual-tests.http`](docs/manual-tests.http) — for the VS Code **REST Client**
+  extension (`humao.rest-client`); click "Send Request" above any request.
+- [`docs/JsonApi.postman_collection.json`](docs/JsonApi.postman_collection.json) —
+  import into **Postman**.
+
+Both expose a `token` variable: set it to a fresh access token from
+`sf org display -o <org> --json` (`result.accessToken`). Tokens are short-lived —
+refresh when you start getting `401`s, and never commit a real token.
+
 ---
 
 ## Adding a resource

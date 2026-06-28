@@ -1,0 +1,333 @@
+###############################################################################
+# JSON:API Framework — manual test requests
+#
+# Use with the VS Code "REST Client" extension (humao.rest-client).
+# Click "Send Request" above any request below.
+#
+# 1. Set @instanceUrl to your org's My Domain URL, and @token to a fresh token:
+#       sf org display -o jsonapi-org --json
+#    -> result.instanceUrl  goes in @instanceUrl
+#    -> result.accessToken  goes in @token   (tokens expire — refresh as needed)
+#
+# 2. Set @accountId / @contactId to real record Ids from your org (e.g. from the
+#    "List accounts" / "List contacts" responses below).
+#
+# NOTE: Account writes (POST/PATCH/DELETE) currently fail in this org because of a
+#       pre-existing broken AccountsTrigger (fflib). Reads work; Contact writes work.
+###############################################################################
+
+@instanceUrl = https://YOUR_DOMAIN.my.salesforce.com
+@baseUrl     = {{instanceUrl}}/services/apexrest/jsonapi
+@token       = REPLACE_WITH_ACCESS_TOKEN
+@accountId   = REPLACE_WITH_ACCOUNT_ID
+@contactId   = REPLACE_WITH_CONTACT_ID
+@mediaType   = application/vnd.api+json
+
+
+###############################################################################
+# ACCOUNTS — reads
+###############################################################################
+
+### List accounts
+GET {{baseUrl}}/accounts
+Authorization: Bearer {{token}}
+Accept: {{mediaType}}
+
+### Single account
+GET {{baseUrl}}/accounts/{{accountId}}
+Authorization: Bearer {{token}}
+Accept: {{mediaType}}
+
+### Sort (descending name)
+GET {{baseUrl}}/accounts?sort=-name
+Authorization: Bearer {{token}}
+Accept: {{mediaType}}
+
+### Sort (multi: industry asc, name desc)
+GET {{baseUrl}}/accounts?sort=industry,-name
+Authorization: Bearer {{token}}
+Accept: {{mediaType}}
+
+### Filter (equality)
+GET {{baseUrl}}/accounts?filter[industry]=Technology
+Authorization: Bearer {{token}}
+Accept: {{mediaType}}
+
+### Sparse fieldsets
+GET {{baseUrl}}/accounts?fields[accounts]=name,phone
+Authorization: Bearer {{token}}
+Accept: {{mediaType}}
+
+### Pagination (page-based)
+GET {{baseUrl}}/accounts?page[size]=5&page[number]=2
+Authorization: Bearer {{token}}
+Accept: {{mediaType}}
+
+### Pagination (offset-based)
+GET {{baseUrl}}/accounts?page[limit]=5&page[offset]=10
+Authorization: Bearer {{token}}
+Accept: {{mediaType}}
+
+### Extend — financials group
+GET {{baseUrl}}/accounts/{{accountId}}?extend=financials
+Authorization: Bearer {{token}}
+Accept: {{mediaType}}
+
+### Extend — multiple groups
+GET {{baseUrl}}/accounts/{{accountId}}?extend=financials,contactInfo
+Authorization: Bearer {{token}}
+Accept: {{mediaType}}
+
+### Include — to-one (parent)
+GET {{baseUrl}}/accounts/{{accountId}}?include=parent
+Authorization: Bearer {{token}}
+Accept: {{mediaType}}
+
+### Include — to-many (contacts)
+GET {{baseUrl}}/accounts/{{accountId}}?include=contacts
+Authorization: Bearer {{token}}
+Accept: {{mediaType}}
+
+### Include — nested (contacts.account)
+GET {{baseUrl}}/accounts/{{accountId}}?include=contacts.account
+Authorization: Bearer {{token}}
+Accept: {{mediaType}}
+
+### Combined (filter + sort + extend + page)
+GET {{baseUrl}}/accounts?filter[industry]=Technology&sort=-name&extend=financials&page[size]=3
+Authorization: Bearer {{token}}
+Accept: {{mediaType}}
+
+### Related — to-one (parent)
+GET {{baseUrl}}/accounts/{{accountId}}/parent
+Authorization: Bearer {{token}}
+Accept: {{mediaType}}
+
+### Related — to-many (contacts)
+GET {{baseUrl}}/accounts/{{accountId}}/contacts
+Authorization: Bearer {{token}}
+Accept: {{mediaType}}
+
+### Relationship linkage — to-one (parent)
+GET {{baseUrl}}/accounts/{{accountId}}/relationships/parent
+Authorization: Bearer {{token}}
+Accept: {{mediaType}}
+
+### Relationship linkage — to-many (contacts)
+GET {{baseUrl}}/accounts/{{accountId}}/relationships/contacts
+Authorization: Bearer {{token}}
+Accept: {{mediaType}}
+
+
+###############################################################################
+# ACCOUNTS — writes  (⚠ blocked in this org by the broken AccountsTrigger)
+###############################################################################
+
+### Create account
+POST {{baseUrl}}/accounts
+Authorization: Bearer {{token}}
+Accept: {{mediaType}}
+Content-Type: {{mediaType}}
+
+{
+  "data": {
+    "type": "accounts",
+    "attributes": { "name": "New Co", "industry": "Finance" }
+  }
+}
+
+### Create account with parent relationship
+POST {{baseUrl}}/accounts
+Authorization: Bearer {{token}}
+Accept: {{mediaType}}
+Content-Type: {{mediaType}}
+
+{
+  "data": {
+    "type": "accounts",
+    "attributes": { "name": "Child Co" },
+    "relationships": {
+      "parent": { "data": { "type": "accounts", "id": "{{accountId}}" } }
+    }
+  }
+}
+
+### Update account
+PATCH {{baseUrl}}/accounts/{{accountId}}
+Authorization: Bearer {{token}}
+Accept: {{mediaType}}
+Content-Type: {{mediaType}}
+
+{
+  "data": {
+    "type": "accounts",
+    "id": "{{accountId}}",
+    "attributes": { "phone": "555-0100" }
+  }
+}
+
+### Delete account
+DELETE {{baseUrl}}/accounts/{{accountId}}
+Authorization: Bearer {{token}}
+Accept: {{mediaType}}
+
+
+###############################################################################
+# CONTACTS — reads
+###############################################################################
+
+### List contacts
+GET {{baseUrl}}/contacts
+Authorization: Bearer {{token}}
+Accept: {{mediaType}}
+
+### Single contact
+GET {{baseUrl}}/contacts/{{contactId}}
+Authorization: Bearer {{token}}
+Accept: {{mediaType}}
+
+### Sort (lastName)
+GET {{baseUrl}}/contacts?sort=lastName
+Authorization: Bearer {{token}}
+Accept: {{mediaType}}
+
+### Filter
+GET {{baseUrl}}/contacts?filter[lastName]=Doe
+Authorization: Bearer {{token}}
+Accept: {{mediaType}}
+
+### Sparse fieldsets
+GET {{baseUrl}}/contacts?fields[contacts]=firstName,lastName
+Authorization: Bearer {{token}}
+Accept: {{mediaType}}
+
+### Pagination
+GET {{baseUrl}}/contacts?page[size]=5&page[number]=1
+Authorization: Bearer {{token}}
+Accept: {{mediaType}}
+
+### Extend — contactInfo group
+GET {{baseUrl}}/contacts/{{contactId}}?extend=contactInfo
+Authorization: Bearer {{token}}
+Accept: {{mediaType}}
+
+### Extend — multiple groups
+GET {{baseUrl}}/contacts/{{contactId}}?extend=contactInfo,professional
+Authorization: Bearer {{token}}
+Accept: {{mediaType}}
+
+### Include — to-one (account)
+GET {{baseUrl}}/contacts/{{contactId}}?include=account
+Authorization: Bearer {{token}}
+Accept: {{mediaType}}
+
+### Include — nested (account.contacts)
+GET {{baseUrl}}/contacts/{{contactId}}?include=account.contacts
+Authorization: Bearer {{token}}
+Accept: {{mediaType}}
+
+### Related — to-one (account)
+GET {{baseUrl}}/contacts/{{contactId}}/account
+Authorization: Bearer {{token}}
+Accept: {{mediaType}}
+
+### Relationship linkage — to-one (account)
+GET {{baseUrl}}/contacts/{{contactId}}/relationships/account
+Authorization: Bearer {{token}}
+Accept: {{mediaType}}
+
+
+###############################################################################
+# CONTACTS — writes  (these work; Contact has no broken trigger)
+###############################################################################
+
+### Create contact
+POST {{baseUrl}}/contacts
+Authorization: Bearer {{token}}
+Accept: {{mediaType}}
+Content-Type: {{mediaType}}
+
+{
+  "data": {
+    "type": "contacts",
+    "attributes": { "firstName": "Ann", "lastName": "Lee", "email": "ann@example.com" }
+  }
+}
+
+### Create contact with account relationship
+POST {{baseUrl}}/contacts
+Authorization: Bearer {{token}}
+Accept: {{mediaType}}
+Content-Type: {{mediaType}}
+
+{
+  "data": {
+    "type": "contacts",
+    "attributes": { "lastName": "Lee" },
+    "relationships": {
+      "account": { "data": { "type": "accounts", "id": "{{accountId}}" } }
+    }
+  }
+}
+
+### Update contact
+PATCH {{baseUrl}}/contacts/{{contactId}}
+Authorization: Bearer {{token}}
+Accept: {{mediaType}}
+Content-Type: {{mediaType}}
+
+{
+  "data": {
+    "type": "contacts",
+    "id": "{{contactId}}",
+    "attributes": { "title": "VP" }
+  }
+}
+
+### Delete contact
+DELETE {{baseUrl}}/contacts/{{contactId}}
+Authorization: Bearer {{token}}
+Accept: {{mediaType}}
+
+
+###############################################################################
+# ERROR CASES
+###############################################################################
+
+### 404 — unknown type
+GET {{baseUrl}}/widgets
+Authorization: Bearer {{token}}
+Accept: {{mediaType}}
+
+### 404 — unknown id
+GET {{baseUrl}}/accounts/001000000000000
+Authorization: Bearer {{token}}
+Accept: {{mediaType}}
+
+### 400 — bad sort field
+GET {{baseUrl}}/accounts?sort=bogus
+Authorization: Bearer {{token}}
+Accept: {{mediaType}}
+
+### 400 — bad extend group
+GET {{baseUrl}}/accounts?extend=bogus
+Authorization: Bearer {{token}}
+Accept: {{mediaType}}
+
+### 400 — bad filter field
+GET {{baseUrl}}/accounts?filter[bogus]=x
+Authorization: Bearer {{token}}
+Accept: {{mediaType}}
+
+### 415 — wrong Content-Type on write
+POST {{baseUrl}}/accounts
+Authorization: Bearer {{token}}
+Accept: {{mediaType}}
+Content-Type: text/plain
+
+{ "data": { "type": "accounts", "attributes": { "name": "x" } } }
+
+### 406 — parameterized Accept media type
+GET {{baseUrl}}/accounts
+Authorization: Bearer {{token}}
+Accept: application/vnd.api+json; charset=utf-8

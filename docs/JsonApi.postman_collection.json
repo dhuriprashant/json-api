@@ -1,0 +1,1299 @@
+{
+  "info": {
+    "name": "Apex JSON:API Framework",
+    "description": "Manual test requests for the Apex JSON:API framework.\n\nSetup: set the `token` collection variable to a fresh access token\n(`sf org display -o jsonapi-org --json` -> result.accessToken). Tokens expire.\n\nNOTE: Account writes fail in the demo org due to a pre-existing broken\nAccountsTrigger (fflib). Reads work; Contact writes work.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "instanceUrl",
+      "value": "https://YOUR_DOMAIN.my.salesforce.com"
+    },
+    {
+      "key": "baseUrl",
+      "value": "{{instanceUrl}}/services/apexrest/jsonapi"
+    },
+    {
+      "key": "token",
+      "value": ""
+    },
+    {
+      "key": "accountId",
+      "value": "REPLACE_WITH_ACCOUNT_ID"
+    },
+    {
+      "key": "contactId",
+      "value": "REPLACE_WITH_CONTACT_ID"
+    },
+    {
+      "key": "mediaType",
+      "value": "application/vnd.api+json"
+    }
+  ],
+  "item": [
+    {
+      "name": "Accounts - Reads",
+      "item": [
+        {
+          "name": "List accounts",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "{{mediaType}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/accounts",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "accounts"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Single account",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "{{mediaType}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/accounts/{{accountId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "accounts",
+                "{{accountId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Sort (descending name)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "{{mediaType}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/accounts?sort=-name",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "accounts"
+              ],
+              "query": [
+                {
+                  "key": "sort",
+                  "value": "-name"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Sort (multi)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "{{mediaType}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/accounts?sort=industry,-name",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "accounts"
+              ],
+              "query": [
+                {
+                  "key": "sort",
+                  "value": "industry,-name"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Filter (equality)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "{{mediaType}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/accounts?filter[industry]=Technology",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "accounts"
+              ],
+              "query": [
+                {
+                  "key": "filter[industry]",
+                  "value": "Technology"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Sparse fieldsets",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "{{mediaType}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/accounts?fields[accounts]=name,phone",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "accounts"
+              ],
+              "query": [
+                {
+                  "key": "fields[accounts]",
+                  "value": "name,phone"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Pagination (page-based)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "{{mediaType}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/accounts?page[size]=5&page[number]=2",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "accounts"
+              ],
+              "query": [
+                {
+                  "key": "page[size]",
+                  "value": "5"
+                },
+                {
+                  "key": "page[number]",
+                  "value": "2"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Pagination (offset-based)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "{{mediaType}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/accounts?page[limit]=5&page[offset]=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "accounts"
+              ],
+              "query": [
+                {
+                  "key": "page[limit]",
+                  "value": "5"
+                },
+                {
+                  "key": "page[offset]",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Extend - financials",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "{{mediaType}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/accounts/{{accountId}}?extend=financials",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "accounts",
+                "{{accountId}}"
+              ],
+              "query": [
+                {
+                  "key": "extend",
+                  "value": "financials"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Extend - multiple groups",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "{{mediaType}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/accounts/{{accountId}}?extend=financials,contactInfo",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "accounts",
+                "{{accountId}}"
+              ],
+              "query": [
+                {
+                  "key": "extend",
+                  "value": "financials,contactInfo"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Include - to-one (parent)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "{{mediaType}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/accounts/{{accountId}}?include=parent",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "accounts",
+                "{{accountId}}"
+              ],
+              "query": [
+                {
+                  "key": "include",
+                  "value": "parent"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Include - to-many (contacts)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "{{mediaType}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/accounts/{{accountId}}?include=contacts",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "accounts",
+                "{{accountId}}"
+              ],
+              "query": [
+                {
+                  "key": "include",
+                  "value": "contacts"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Include - nested (contacts.account)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "{{mediaType}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/accounts/{{accountId}}?include=contacts.account",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "accounts",
+                "{{accountId}}"
+              ],
+              "query": [
+                {
+                  "key": "include",
+                  "value": "contacts.account"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Combined (filter+sort+extend+page)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "{{mediaType}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/accounts?filter[industry]=Technology&sort=-name&extend=financials&page[size]=3",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "accounts"
+              ],
+              "query": [
+                {
+                  "key": "filter[industry]",
+                  "value": "Technology"
+                },
+                {
+                  "key": "sort",
+                  "value": "-name"
+                },
+                {
+                  "key": "extend",
+                  "value": "financials"
+                },
+                {
+                  "key": "page[size]",
+                  "value": "3"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Related - to-one (parent)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "{{mediaType}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/accounts/{{accountId}}/parent",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "accounts",
+                "{{accountId}}",
+                "parent"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Related - to-many (contacts)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "{{mediaType}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/accounts/{{accountId}}/contacts",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "accounts",
+                "{{accountId}}",
+                "contacts"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Linkage - to-one (parent)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "{{mediaType}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/accounts/{{accountId}}/relationships/parent",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "accounts",
+                "{{accountId}}",
+                "relationships",
+                "parent"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Linkage - to-many (contacts)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "{{mediaType}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/accounts/{{accountId}}/relationships/contacts",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "accounts",
+                "{{accountId}}",
+                "relationships",
+                "contacts"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Accounts - Writes (blocked by broken AccountsTrigger)",
+      "item": [
+        {
+          "name": "Create account",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "{{mediaType}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "{{mediaType}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/accounts",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "accounts"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"data\": {\n        \"type\": \"accounts\",\n        \"attributes\": {\n            \"name\": \"New Co\",\n            \"industry\": \"Finance\"\n        }\n    }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Create account with parent",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "{{mediaType}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "{{mediaType}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/accounts",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "accounts"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"data\": {\n        \"type\": \"accounts\",\n        \"attributes\": {\n            \"name\": \"Child Co\"\n        },\n        \"relationships\": {\n            \"parent\": {\n                \"data\": {\n                    \"type\": \"accounts\",\n                    \"id\": \"{{accountId}}\"\n                }\n            }\n        }\n    }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Update account",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "{{mediaType}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "{{mediaType}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/accounts/{{accountId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "accounts",
+                "{{accountId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"data\": {\n        \"type\": \"accounts\",\n        \"id\": \"{{accountId}}\",\n        \"attributes\": {\n            \"phone\": \"555-0100\"\n        }\n    }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Delete account",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "{{mediaType}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/accounts/{{accountId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "accounts",
+                "{{accountId}}"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Contacts - Reads",
+      "item": [
+        {
+          "name": "List contacts",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "{{mediaType}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/contacts",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "contacts"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Single contact",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "{{mediaType}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/contacts/{{contactId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "contacts",
+                "{{contactId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Sort (lastName)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "{{mediaType}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/contacts?sort=lastName",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "contacts"
+              ],
+              "query": [
+                {
+                  "key": "sort",
+                  "value": "lastName"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Filter",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "{{mediaType}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/contacts?filter[lastName]=Doe",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "contacts"
+              ],
+              "query": [
+                {
+                  "key": "filter[lastName]",
+                  "value": "Doe"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Sparse fieldsets",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "{{mediaType}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/contacts?fields[contacts]=firstName,lastName",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "contacts"
+              ],
+              "query": [
+                {
+                  "key": "fields[contacts]",
+                  "value": "firstName,lastName"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Pagination",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "{{mediaType}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/contacts?page[size]=5&page[number]=1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "contacts"
+              ],
+              "query": [
+                {
+                  "key": "page[size]",
+                  "value": "5"
+                },
+                {
+                  "key": "page[number]",
+                  "value": "1"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Extend - contactInfo",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "{{mediaType}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/contacts/{{contactId}}?extend=contactInfo",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "contacts",
+                "{{contactId}}"
+              ],
+              "query": [
+                {
+                  "key": "extend",
+                  "value": "contactInfo"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Extend - multiple groups",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "{{mediaType}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/contacts/{{contactId}}?extend=contactInfo,professional",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "contacts",
+                "{{contactId}}"
+              ],
+              "query": [
+                {
+                  "key": "extend",
+                  "value": "contactInfo,professional"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Include - to-one (account)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "{{mediaType}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/contacts/{{contactId}}?include=account",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "contacts",
+                "{{contactId}}"
+              ],
+              "query": [
+                {
+                  "key": "include",
+                  "value": "account"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Include - nested (account.contacts)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "{{mediaType}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/contacts/{{contactId}}?include=account.contacts",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "contacts",
+                "{{contactId}}"
+              ],
+              "query": [
+                {
+                  "key": "include",
+                  "value": "account.contacts"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Related - to-one (account)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "{{mediaType}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/contacts/{{contactId}}/account",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "contacts",
+                "{{contactId}}",
+                "account"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Linkage - to-one (account)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "{{mediaType}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/contacts/{{contactId}}/relationships/account",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "contacts",
+                "{{contactId}}",
+                "relationships",
+                "account"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Contacts - Writes",
+      "item": [
+        {
+          "name": "Create contact",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "{{mediaType}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "{{mediaType}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/contacts",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "contacts"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"data\": {\n        \"type\": \"contacts\",\n        \"attributes\": {\n            \"firstName\": \"Ann\",\n            \"lastName\": \"Lee\",\n            \"email\": \"ann@example.com\"\n        }\n    }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Create contact with account",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "{{mediaType}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "{{mediaType}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/contacts",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "contacts"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"data\": {\n        \"type\": \"contacts\",\n        \"attributes\": {\n            \"lastName\": \"Lee\"\n        },\n        \"relationships\": {\n            \"account\": {\n                \"data\": {\n                    \"type\": \"accounts\",\n                    \"id\": \"{{accountId}}\"\n                }\n            }\n        }\n    }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Update contact",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "{{mediaType}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "{{mediaType}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/contacts/{{contactId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "contacts",
+                "{{contactId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"data\": {\n        \"type\": \"contacts\",\n        \"id\": \"{{contactId}}\",\n        \"attributes\": {\n            \"title\": \"VP\"\n        }\n    }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Delete contact",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "{{mediaType}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/contacts/{{contactId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "contacts",
+                "{{contactId}}"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Error cases",
+      "item": [
+        {
+          "name": "404 - unknown type",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "{{mediaType}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/widgets",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "widgets"
+              ]
+            }
+          }
+        },
+        {
+          "name": "404 - unknown id",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "{{mediaType}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/accounts/001000000000000",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "accounts",
+                "001000000000000"
+              ]
+            }
+          }
+        },
+        {
+          "name": "400 - bad sort field",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "{{mediaType}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/accounts?sort=bogus",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "accounts"
+              ],
+              "query": [
+                {
+                  "key": "sort",
+                  "value": "bogus"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "400 - bad extend group",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "{{mediaType}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/accounts?extend=bogus",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "accounts"
+              ],
+              "query": [
+                {
+                  "key": "extend",
+                  "value": "bogus"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "400 - bad filter field",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "{{mediaType}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/accounts?filter[bogus]=x",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "accounts"
+              ],
+              "query": [
+                {
+                  "key": "filter[bogus]",
+                  "value": "x"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "415 - wrong Content-Type",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "{{mediaType}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "text/plain"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/accounts",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "accounts"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"data\": {\n        \"type\": \"accounts\",\n        \"attributes\": {\n            \"name\": \"x\"\n        }\n    }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "406 - parameterized Accept",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/vnd.api+json; charset=utf-8"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/accounts",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "accounts"
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
