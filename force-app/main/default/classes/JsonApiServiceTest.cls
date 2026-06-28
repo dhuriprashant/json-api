@@ -66,6 +66,52 @@ private class JsonApiServiceTest {
     }
 
     @IsTest
+    static void defaultReturnsOnlyBaseAttributes() {
+        Id id = acme().Id;
+        JsonApiResponse r = handle('GET', new List<String>{ 'accounts', id },
+            new Map<String, String>(), null);
+
+        JsonApiResourceObject obj = (JsonApiResourceObject) r.document.data;
+        System.assertEquals(2, obj.attributes.size(), 'only the base group by default');
+        System.assert(obj.attributes.containsKey('name'));
+        System.assert(obj.attributes.containsKey('industry'));
+        System.assert(!obj.attributes.containsKey('annualRevenue'), 'financials not returned');
+    }
+
+    @IsTest
+    static void extendAddsRequestedGroup() {
+        Id id = acme().Id;
+        JsonApiResponse r = handle('GET', new List<String>{ 'accounts', id },
+            new Map<String, String>{ 'extend' => 'financials' }, null);
+
+        JsonApiResourceObject obj = (JsonApiResourceObject) r.document.data;
+        System.assert(obj.attributes.containsKey('name'), 'base still present');
+        System.assert(obj.attributes.containsKey('annualRevenue'), 'financials group added');
+        System.assert(!obj.attributes.containsKey('phone'), 'contactInfo not requested');
+    }
+
+    @IsTest
+    static void extendAddsMultipleGroups() {
+        Id id = acme().Id;
+        JsonApiResponse r = handle('GET', new List<String>{ 'accounts', id },
+            new Map<String, String>{ 'extend' => 'financials,contactInfo' }, null);
+
+        JsonApiResourceObject obj = (JsonApiResourceObject) r.document.data;
+        System.assertEquals(6, obj.attributes.size(), 'base + financials + contactInfo');
+    }
+
+    @IsTest
+    static void unknownExtendGroupIsBadRequest() {
+        try {
+            handle('GET', new List<String>{ 'accounts', acme().Id },
+                new Map<String, String>{ 'extend' => 'bogus' }, null);
+            System.assert(false, 'expected exception');
+        } catch (JsonApiException e) {
+            System.assertEquals(400, e.httpStatus);
+        }
+    }
+
+    @IsTest
     static void filtersAndSorts() {
         JsonApiResponse r = handle('GET', new List<String>{ 'accounts' },
             new Map<String, String>{ 'filter[industry]' => 'Technology', 'sort' => '-name' }, null);

@@ -19,6 +19,8 @@ public with sharing class JsonApiConstants {
     public static final String PARAM_FIELDS = 'fields';
     public static final String PARAM_PAGE = 'page';
     public static final String PARAM_FILTER = 'filter';
+    /** Comma-separated list of extra attribute groups to include in the payload. */
+    public static final String PARAM_EXTEND = 'extend';
 
     // ---- Pagination sub-keys ----
     public static final String PAGE_LIMIT = 'limit';

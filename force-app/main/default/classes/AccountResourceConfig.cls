@@ -12,14 +12,24 @@ public with sharing class AccountResourceConfig extends JsonApiResourceConfig {
         return Account.SObjectType;
     }
 
-    public override Map<String, String> getAttributeMap() {
-        return new Map<String, String>{
-            'name' => 'Name',
-            'industry' => 'Industry',
-            'phone' => 'Phone',
-            'website' => 'Website',
-            'annualRevenue' => 'AnnualRevenue',
-            'numberOfEmployees' => 'NumberOfEmployees'
+    /**
+     * "base" is always returned; "contactInfo" and "financials" are returned
+     * only when requested via `?extend=contactInfo,financials`.
+     */
+    public override Map<String, Map<String, String>> getAttributeGroups() {
+        return new Map<String, Map<String, String>>{
+            'base' => new Map<String, String>{
+                'name' => 'Name',
+                'industry' => 'Industry'
+            },
+            'contactInfo' => new Map<String, String>{
+                'phone' => 'Phone',
+                'website' => 'Website'
+            },
+            'financials' => new Map<String, String>{
+                'annualRevenue' => 'AnnualRevenue',
+                'numberOfEmployees' => 'NumberOfEmployees'
+            }
         };
     }
 

@@ -32,20 +32,18 @@ public with sharing class JsonApiSerializer {
         String id = String.valueOf(record.get('Id'));
         JsonApiResourceObject resource = new JsonApiResourceObject(type, id);
 
-        Set<String> requested = options != null && options.hasSparseFieldsFor(type)
-            ? options.sparseFieldsFor(type)
-            : null;
-
-        // Attributes
-        for (String attr : config.getAttributeMap().keySet()) {
-            if (requested == null || requested.contains(attr)) {
-                resource.putAttribute(attr, record.get(config.fieldFor(attr)));
-            }
+        // Attributes: sparse fieldset (if any) or base + `extend` groups.
+        for (String attr : config.resolveAttributeNames(options)) {
+            resource.putAttribute(attr, record.get(config.fieldFor(attr)));
         }
 
-        // Relationships
+        // Relationships: a sparse fieldset can restrict which are emitted;
+        // the `extend` groups affect attributes only, not relationships.
+        Set<String> sparse = options != null && options.hasSparseFieldsFor(type)
+            ? options.sparseFieldsFor(type)
+            : null;
         for (JsonApiRelationshipDef def : config.getRelationships().values()) {
-            if (requested != null && !requested.contains(def.name)) {
+            if (sparse != null && !sparse.contains(def.name)) {
                 continue;
             }
             resource.putRelationship(def.name, buildRelationship(record, id, type, def));

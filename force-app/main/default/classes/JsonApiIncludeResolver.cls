@@ -98,14 +98,8 @@ public with sharing class JsonApiIncludeResolver {
     /** Mirrors the builder's field selection for related resources. */
     private Set<String> selectFields(JsonApiResourceConfig config, JsonApiQueryOptions options) {
         Set<String> fields = new Set<String>{ 'Id' };
-        if (options != null && options.hasSparseFieldsFor(config.getType())) {
-            for (String attr : options.sparseFieldsFor(config.getType())) {
-                if (config.hasAttribute(attr)) {
-                    fields.add(config.fieldFor(attr));
-                }
-            }
-        } else {
-            fields.addAll(config.getAttributeFieldNames());
+        for (String attr : config.resolveAttributeNames(options)) {
+            fields.add(config.fieldFor(attr));
         }
         for (JsonApiRelationshipDef def : config.getRelationships().values()) {
             if (!def.isToMany && def.lookupField != null) {

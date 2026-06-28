@@ -16,7 +16,7 @@ reference, see [`JSON-API-README.md`](../force-app/main/default/classes/JSON-API
 
 | Goal | How it's realized |
 |------|-------------------|
-| **Configuration over code** | New resources are exposed by subclassing `JsonApiResourceConfig` + one registration line — no new endpoints, parsing, or SOQL. |
+| **Configuration over code** | New resources are exposed by subclassing `JsonApiResourceConfig` + one `JsonApiResource__mdt` Custom Metadata record — no change to the framework, no new endpoints, parsing, or SOQL. |
 | **Single responsibility per class** | HTTP, routing, parsing, query building, serialization, and persistence are separate, independently testable units. |
 | **Secure by default** | All SOQL/DML run in `AccessLevel.USER_MODE`; identifiers come only from config; values are always bind variables. |
 | **Spec compliance** | Document model mirrors the JSON:API object model; content negotiation and error documents follow the spec. |
@@ -105,14 +105,29 @@ A resource is fully described by a `JsonApiResourceConfig` subclass:
 ```apex
 public override String getType();                          // 'accounts'
 public override Schema.SObjectType getSObjectType();       // Account.SObjectType
-public override Map<String,String> getAttributeMap();      // jsonName -> Field API name
+public override Map<String,Map<String,String>> getAttributeGroups(); // group -> (jsonName -> Field)
 public virtual  Map<String,JsonApiRelationshipDef> getRelationships();
 public virtual  Set<String> getWritableAttributes();       // defaults to all mapped
 ```
 
 Derived helpers on the base class (do not override) keep subclasses terse:
-`getFieldToAttributeMap()`, `getAttributeFieldNames()`, `hasAttribute()`,
-`fieldFor()`, `relationshipFor()`.
+`getAttributeMap()` (the flattened union of all groups), `getFieldToAttributeMap()`,
+`getAttributeFieldNames()`, `hasAttribute()`, `fieldFor()`, `hasGroup()`,
+`relationshipFor()`.
+
+### Attribute groups & `extend`
+
+Attributes are partitioned into named groups via `getAttributeGroups()`. The
+`base` group (`JsonApiResourceConfig.BASE_GROUP`) is always returned; other groups
+are opt-in through the `extend` query param. Two helpers drive selection:
+
+- `attributesForGroups(extendGroups)` — base ∪ each requested group that exists on
+  this resource (unknown groups ignored, so it's safe to apply to related types).
+- `resolveAttributeNames(options)` — the single source of truth for *which*
+  attributes to expose: a sparse `fields[type]` set wins if present, otherwise
+  `attributesForGroups(options.extendGroups)`. The query builder, serializer, and
+  include resolver all call this, so projected columns and serialized output never
+  diverge.
 
 ### Relationships
 
@@ -163,12 +178,15 @@ from the *key* with the regex `^(\w+)\[([^\]]+)\]$`:
 | `filter[industry]` | `filter` | `industry` | equality filter |
 | `include` | — | — | relationship paths |
 | `sort` | — | — | sort directives |
+| `extend` | — | — | extra attribute groups |
 
 **Validation happens at parse time** against the *primary* config:
 - `sort` / `filter` attributes must exist in the config → else `400` with a
   `source.parameter`. This guarantees only known fields reach the SOQL builder.
 - `include` validates the **first** path segment; deeper segments are validated by
   the include resolver as it descends.
+- `extend` group names must exist on the primary config → else `400`; the `base`
+  group is implicit and silently skipped if named.
 - `page[...]` values must be non-negative integers; size is clamped to
   `MAX_PAGE_SIZE`, offset to `MAX_OFFSET` (the platform's 2000 ceiling).
 
@@ -194,8 +212,9 @@ it injection-proof:
 
 `selectFields()` returns a `Set<String>`:
 - always `Id`;
-- the configured attribute fields — or, when `fields[type]` is present, only the
-  requested ones (unknown requested attributes are silently ignored);
+- the fields backing `config.resolveAttributeNames(options)` — i.e. the sparse
+  `fields[type]` set if present, otherwise the `base` group plus any `extend`
+  groups — so only columns that will actually be serialized are queried;
 - all to-one lookup fields (cheap, and needed to emit to-one linkage).
 
 ### Value coercion
@@ -370,7 +389,7 @@ Tests exercise the stack at two levels so the core is verifiable without HTTP:
 | `JsonApiRestResourceTest` | HTTP layer: `RestContext` plumbing, content negotiation (415/406), error rendering, `segmentsOf` URI parsing. |
 | `JsonApiCoverageTest` | Config helpers, deserializer validation/coercion branches, nested include, document-model helpers. |
 
-**Status:** 43/43 passing, 87% org-wide coverage (clean scratch org), and verified
+**Status:** 53/53 passing, 89% org-wide coverage (clean scratch org), and verified
 live over HTTP against a real org.
 
 > The tests insert real `Account`/`Contact` records, so a broken Account/Contact

@@ -70,14 +70,9 @@ public with sharing class JsonApiQueryBuilder {
     private Set<String> selectFields() {
         Set<String> fields = new Set<String>{ 'Id' };
 
-        if (options.hasSparseFieldsFor(config.getType())) {
-            for (String attr : options.sparseFieldsFor(config.getType())) {
-                if (config.hasAttribute(attr)) {
-                    fields.add(config.fieldFor(attr));
-                }
-            }
-        } else {
-            fields.addAll(config.getAttributeFieldNames());
+        // Sparse fieldset (if any) or base + `extend` groups decide the columns.
+        for (String attr : config.resolveAttributeNames(options)) {
+            fields.add(config.fieldFor(attr));
         }
 
         // Always select to-one lookup fields so we can emit relationship linkage.

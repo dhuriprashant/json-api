@@ -39,7 +39,7 @@ A request walks one path through the layers; understanding this sequence is the 
 1. **`JsonApiRestResource`** (`@RestResource(urlMapping='/jsonapi/*')`) — the only HTTP entry point. Handles HTTP concerns only: content negotiation (enforces the `application/vnd.api+json` media type → 415/406), splits the URI into path segments after the `jsonapi` base, catches exceptions and renders them. Delegates everything else to the service.
 2. **`JsonApiService`** — the orchestration core. Contains the routing table (maps verb + segment shape to an operation) and runs all SOQL/DML in `AccessLevel.USER_MODE`.
 3. **`JsonApiRegistry` / `JsonApiBootstrap`** — `forType(type)` resolves the JSON:API type string to its config, throwing 404 if unregistered. The registry lazily self-initializes by calling `JsonApiBootstrap.registerAll()` on first lookup.
-4. **`JsonApiRequestParser` → `JsonApiQueryOptions`** — parses query params (`include`, `fields[]`, `sort`, `filter[]`, `page[]`) into a typed options object.
+4. **`JsonApiRequestParser` → `JsonApiQueryOptions`** — parses query params (`include`, `fields[]`, `sort`, `filter[]`, `page[]`, `extend`) into a typed options object. `extend` names attribute groups to add on top of the always-returned `base` group.
 5. **`JsonApiQueryBuilder`** — builds SOQL strings + a `binds` map from config + options. All field/object names come from configs (never user input); all filter values are bind variables — no SOQL injection.
 6. **`JsonApiSerializer` / `JsonApiDeserializer` / `JsonApiIncludeResolver`** — convert SObjects ↔ the document model. The include resolver populates the top-level `included` array.
 7. **Document model** — `JsonApiDocument`, `JsonApiResourceObject`, `JsonApiResourceIdentifier`, `JsonApiRelationship`, `JsonApiError`, `JsonApiErrorSource`. `JsonApiResponse` wraps status + headers + document.
@@ -51,7 +51,7 @@ A request walks one path through the layers; understanding this sequence is the 
 
 The whole framework is driven by `JsonApiResourceConfig` subclasses. To expose a new SObject:
 
-1. Subclass `JsonApiResourceConfig`. Three abstract methods are required: `getType()` (the JSON:API type string), `getSObjectType()`, and `getAttributeMap()` (JSON:API attribute name → SObject field API name; **do not** map `id` here). Optionally override `getRelationships()` and `getWritableAttributes()` (defaults to all mapped attributes — override to exclude formula/rollup/system fields). See `AccountResourceConfig` / `ContactResourceConfig`.
+1. Subclass `JsonApiResourceConfig`. Three abstract methods are required: `getType()` (the JSON:API type string), `getSObjectType()`, and `getAttributeGroups()` (group name → map of JSON:API attribute name → SObject field API name; **do not** map `id` here). The `base` group is always returned; other groups are returned only when the client opts in via the `extend` query param (e.g. `?extend=financials`). Optionally override `getRelationships()` and `getWritableAttributes()` (defaults to all mapped attributes across every group — override to exclude formula/rollup/system fields). See `AccountResourceConfig` / `ContactResourceConfig`.
 2. Add a `JsonApiResource__mdt` Custom Metadata record whose `Apex_Class__c` is your config class name and `Is_Active__c` is checked (see `customMetadata/JsonApiResource.Accounts.md-meta.xml`). `JsonApiBootstrap.registerAll()` loads active records and instantiates each via `Type.forName().newInstance()` — no Apex change to the framework is needed.
 
 Relationships are declared via `JsonApiRelationshipDef.toOne(name, targetType, lookupField)` (lookup field on this object) or `JsonApiRelationshipDef.toMany(name, targetType, childForeignKeyField)` (FK field on the child object).
@@ -60,6 +60,7 @@ Relationships are declared via `JsonApiRelationshipDef.toOne(name, targetType, l
 
 - Apex API version is `58.0` (`sfdx-project.json`); no namespace.
 - All data access must stay in `AccessLevel.USER_MODE` to keep CRUD/FLS enforcement — preserve this in any new query/DML path.
+- Attributes are grouped via `getAttributeGroups()`; `base` is always returned, other groups only via `?extend=group1,group2`. A sparse `fields[type]` set takes precedence over `extend`. `resolveAttributeNames()` is the single source of truth used by the builder, serializer, and include resolver.
 - Filtering is equality-only; extend `JsonApiQueryBuilder.computeWhere()` to add operators.
 - `include` inlines the `included` array and to-one linkage; to-many linkage is exposed via the relationship endpoints, not inlined in primary `data`.
 - Bulk/atomic operations and writes to relationship endpoints are not implemented.

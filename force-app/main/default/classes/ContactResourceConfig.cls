@@ -12,13 +12,23 @@ public with sharing class ContactResourceConfig extends JsonApiResourceConfig {
         return Contact.SObjectType;
     }
 
-    public override Map<String, String> getAttributeMap() {
-        return new Map<String, String>{
-            'firstName' => 'FirstName',
-            'lastName' => 'LastName',
-            'email' => 'Email',
-            'phone' => 'Phone',
-            'title' => 'Title'
+    /**
+     * "base" is always returned; "contactInfo" and "professional" are returned
+     * only when requested via `?extend=contactInfo,professional`.
+     */
+    public override Map<String, Map<String, String>> getAttributeGroups() {
+        return new Map<String, Map<String, String>>{
+            'base' => new Map<String, String>{
+                'firstName' => 'FirstName',
+                'lastName' => 'LastName'
+            },
+            'contactInfo' => new Map<String, String>{
+                'email' => 'Email',
+                'phone' => 'Phone'
+            },
+            'professional' => new Map<String, String>{
+                'title' => 'Title'
+            }
         };
     }
 

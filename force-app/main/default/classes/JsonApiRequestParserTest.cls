@@ -49,6 +49,28 @@ private class JsonApiRequestParserTest {
     }
 
     @IsTest
+    static void parsesExtendGroups() {
+        JsonApiQueryOptions opts = JsonApiRequestParser.parse(
+            new Map<String, String>{ 'extend' => 'financials,contactInfo' }, config());
+        System.assertEquals(2, opts.extendGroups.size());
+        System.assert(opts.extendGroups.contains('financials'));
+        System.assert(opts.extendGroups.contains('contactInfo'));
+    }
+
+    @IsTest
+    static void ignoresBaseGroupInExtend() {
+        JsonApiQueryOptions opts = JsonApiRequestParser.parse(
+            new Map<String, String>{ 'extend' => 'base,financials' }, config());
+        System.assertEquals(1, opts.extendGroups.size(), 'base is implicit, not stored');
+        System.assert(opts.extendGroups.contains('financials'));
+    }
+
+    @IsTest
+    static void rejectsUnknownExtendGroup() {
+        assertBadRequest(new Map<String, String>{ 'extend' => 'bogus' });
+    }
+
+    @IsTest
     static void rejectsUnknownSortAttribute() {
         assertBadRequest(new Map<String, String>{ 'sort' => 'bogusField' });
     }

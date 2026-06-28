@@ -42,10 +42,34 @@ public with sharing class JsonApiRequestParser {
                     parseInclude(opts, config, value);
                 } else if (key == JsonApiConstants.PARAM_SORT) {
                     parseSort(opts, config, value);
+                } else if (key == JsonApiConstants.PARAM_EXTEND) {
+                    parseExtend(opts, config, value);
                 }
             }
         }
         return opts;
+    }
+
+    private static void parseExtend(JsonApiQueryOptions opts, JsonApiResourceConfig config, String value) {
+        if (String.isBlank(value)) {
+            return;
+        }
+        for (String token : value.split(',')) {
+            String grp = token.trim();
+            if (String.isBlank(grp)) {
+                continue;
+            }
+            // The base group is always returned; naming it is harmless but redundant.
+            if (grp == JsonApiResourceConfig.BASE_GROUP) {
+                continue;
+            }
+            if (!config.hasGroup(grp)) {
+                throw JsonApiException.badRequest(
+                    'Cannot extend with unknown attribute group "' + grp + '".',
+                    JsonApiErrorSource.forParameter(JsonApiConstants.PARAM_EXTEND));
+            }
+            opts.extendGroups.add(grp);
+        }
     }
 
     private static void parseInclude(JsonApiQueryOptions opts, JsonApiResourceConfig config, String value) {

@@ -18,7 +18,7 @@ security is enforced by the platform for the running user.
 
 ## Status
 
-- ✅ **43/43 Apex tests passing**, 87% org-wide coverage (clean scratch org).
+- ✅ **53/53 Apex tests passing**, 89% org-wide coverage (clean scratch org).
 - ✅ **Confirmed live** against a real org — sparse fieldsets, pagination,
   `include` compound documents, relationship linkage and error responses all
   verified end-to-end over HTTP.
@@ -45,7 +45,8 @@ Everything is served under `/services/apexrest/jsonapi`.
 | Parameter            | Example                              | Notes                                   |
 |----------------------|--------------------------------------|-----------------------------------------|
 | `include`            | `?include=parent,contacts`           | Comma-separated; supports nested paths (`contacts.account`) |
-| `fields[TYPE]`       | `?fields[accounts]=name,phone`       | Sparse fieldsets, per type              |
+| `extend`             | `?extend=financials,contactInfo`     | Comma-separated attribute **groups** to add on top of `base` |
+| `fields[TYPE]`       | `?fields[accounts]=name,phone`       | Sparse fieldsets, per type (takes precedence over `extend`) |
 | `sort`               | `?sort=-annualRevenue,name`          | `-` prefix = descending                 |
 | `filter[ATTR]`       | `?filter[industry]=Technology`       | Equality; multiple filters are AND-ed   |
 | `page[size]`,`page[number]` | `?page[size]=10&page[number]=2`| Page-based pagination                    |
@@ -110,6 +111,37 @@ Returns `201 Created` with a `Location` header and the created resource.
 
 ---
 
+## Attribute groups & `extend`
+
+Each resource organizes its attributes into named **groups**. The `base` group is
+always returned; any other group is returned only when the client asks for it via
+the comma-separated `extend` query parameter. This keeps the default payload small
+while letting clients pull richer data on demand.
+
+For example, `AccountResourceConfig` defines:
+
+| Group         | Attributes                          |
+|---------------|-------------------------------------|
+| `base`        | `name`, `industry`                  |
+| `contactInfo` | `phone`, `website`                  |
+| `financials`  | `annualRevenue`, `numberOfEmployees`|
+
+```
+GET /accounts/001...                              → name, industry
+GET /accounts/001...?extend=financials            → name, industry, annualRevenue, numberOfEmployees
+GET /accounts/001...?extend=financials,contactInfo → all six attributes
+```
+
+Notes:
+- `extend` applies to the primary resource **and** to any side-loaded (`include`d)
+  resources that define a group of the same name; types without that group simply
+  return their `base`.
+- An unknown group name → `400 Bad Request` (`source.parameter: "extend"`).
+- `fields[TYPE]` (sparse fieldsets) **takes precedence**: if present, it selects
+  the exact attributes and `extend` is ignored for that type.
+
+---
+
 ## Adding a new resource
 
 1. Create a config that extends `JsonApiResourceConfig`:
@@ -118,9 +150,11 @@ Returns `201 Created` with a `Location` header and the created resource.
 public with sharing class OpportunityResourceConfig extends JsonApiResourceConfig {
     public override String getType() { return 'opportunities'; }
     public override Schema.SObjectType getSObjectType() { return Opportunity.SObjectType; }
-    public override Map<String, String> getAttributeMap() {
-        return new Map<String, String>{
-            'name' => 'Name', 'stage' => 'StageName', 'amount' => 'Amount'
+    // "base" is always returned; other groups only when named in ?extend=...
+    public override Map<String, Map<String, String>> getAttributeGroups() {
+        return new Map<String, Map<String, String>>{
+            'base'    => new Map<String, String>{ 'name' => 'Name', 'stage' => 'StageName' },
+            'details' => new Map<String, String>{ 'amount' => 'Amount', 'closeDate' => 'CloseDate' }
         };
     }
     public override Map<String, JsonApiRelationshipDef> getRelationships() {
@@ -130,7 +164,7 @@ public with sharing class OpportunityResourceConfig extends JsonApiResourceConfi
     }
     // Optional: lock down which attributes may be written.
     public override Set<String> getWritableAttributes() {
-        return new Set<String>{ 'name', 'stage', 'amount' };
+        return new Set<String>{ 'name', 'stage', 'amount', 'closeDate' };
     }
 }
 ```

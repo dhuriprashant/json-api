@@ -23,6 +23,9 @@ public class JsonApiQueryOptions {
     /** type -> requested attribute names (sparse fieldsets). */
     public Map<String, Set<String>> sparseFields = new Map<String, Set<String>>();
 
+    /** Extra attribute groups requested via `extend` (the base group is implicit). */
+    public Set<String> extendGroups = new Set<String>();
+
     public List<SortField> sorts = new List<SortField>();
 
     /** filter attribute name -> value (equality). */

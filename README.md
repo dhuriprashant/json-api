@@ -17,7 +17,7 @@ all enforced under the running user's CRUD/FLS via `AccessLevel.USER_MODE`.
 
 ## Status
 
-- ✅ **Validated:** 43/43 Apex tests passing, 87% org-wide coverage (clean scratch org).
+- ✅ **Validated:** 53/53 Apex tests passing, 89% org-wide coverage (clean scratch org).
 - ✅ **Deployed & confirmed live** — GET (sparse fieldsets, pagination, `include`
   compound documents) and error responses verified against a real org.
 
@@ -30,6 +30,7 @@ all enforced under the running user's CRUD/FLS via `AccessLevel.USER_MODE`.
 | CRUD                  | `GET/POST/PATCH/DELETE /{type}[/{id}]`                         |
 | Relationships         | `GET /{type}/{id}/{relationship}` and `.../relationships/{rel}`|
 | Compound documents    | `?include=parent,contacts` (supports nested, e.g. `contacts.account`) |
+| Attribute groups      | `?extend=financials,contactInfo` (opt into extra groups beyond `base`) |
 | Sparse fieldsets      | `?fields[accounts]=name,industry`                              |
 | Sorting               | `?sort=-annualRevenue,name`                                    |
 | Filtering             | `?filter[industry]=Technology`                                |
@@ -86,9 +87,11 @@ curl "$INSTANCE_URL/services/apexrest/jsonapi/accounts?fields[accounts]=name,ind
 
 ## Adding a resource
 
-1. Create a `JsonApiResourceConfig` subclass mapping a JSON:API type to an SObject
-   (see `AccountResourceConfig` / `ContactResourceConfig`).
-2. Register it with one line in `JsonApiBootstrap.registerAll()`.
+1. Create a `JsonApiResourceConfig` subclass mapping a JSON:API type to an SObject,
+   with attributes organized into groups (see `AccountResourceConfig` /
+   `ContactResourceConfig`).
+2. Add a `JsonApiResource__mdt` Custom Metadata record pointing at that class — no
+   framework code change needed.
 
 That's it — the new type is live. Full walkthrough in the
 [framework README](force-app/main/default/classes/JSON-API-README.md#adding-a-new-resource).
@@ -101,3 +104,5 @@ That's it — the new type is live. Full walkthrough in the
 - `config/project-scratch-def.json` — scratch org definition
 - `docs/TECHNICAL.md` — detailed technical/architecture documentation
 - `force-app/main/default/classes/` — the framework (23 classes) + tests + docs
+- `force-app/main/default/objects/JsonApiResource__mdt/` — the resource-registration Custom Metadata Type
+- `force-app/main/default/customMetadata/` — one `JsonApiResource` record per exposed resource
