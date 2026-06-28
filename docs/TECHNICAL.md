@@ -7,7 +7,7 @@ at developers maintaining or extending the framework. For usage/endpoint
 reference, see [`JSON-API-README.md`](../force-app/main/default/classes/JSON-API-README.md).
 
 - **Spec target:** [JSON:API v1.1](https://jsonapi.org/format/)
-- **Platform:** Apex (API 58.0), no namespace, no external dependencies
+- **Platform:** Apex (API 65.0), no namespace, no external dependencies
 - **Source:** `force-app/main/default/classes/`
 
 ---
@@ -393,7 +393,7 @@ and verified live over HTTP against a real org.
 
 ## 15. Conventions
 
-- Apex API version **58.0**; no namespace.
+- Apex API version **65.0**; no namespace.
 - All data-access classes are `with sharing`; only `JsonApiRestResource` is
   `global` (required for `@RestResource`).
 - Reserved Apex identifiers are avoided (e.g. the sort DTO is `SortField`, not

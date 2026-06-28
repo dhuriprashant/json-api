@@ -58,7 +58,7 @@ Relationships are declared via `JsonApiRelationshipDef.toOne(name, targetType, l
 
 ## Conventions & constraints
 
-- Apex API version is `58.0` (`sfdx-project.json`); no namespace.
+- Apex API version is `65.0` (`sfdx-project.json`); no namespace.
 - Read-only: only `GET` is implemented. `JsonApiService.handle` rejects any non-GET verb with 405, and `JsonApiRestResource` exposes only `@HttpGet`. There is no create/update/delete path or deserializer.
 - All data access must stay in `AccessLevel.USER_MODE` to keep CRUD/FLS enforcement — preserve this in any new query/DML path.
 - Attributes are grouped via `getAttributeGroups()`; `base` is always returned, other groups only via `?extend=group1,group2`. A sparse `fields[type]` set takes precedence over `extend`. `resolveAttributeNames()` is the single source of truth used by the builder, serializer, and include resolver.
