@@ -109,35 +109,35 @@ sequenceDiagram
     participant Reg as JsonApiRegistry
     participant Parser as JsonApiRequestParser
     participant Builder as JsonApiQueryBuilder
-    participant DB as Database·USER_MODE
+    participant DB as Database USER_MODE
     participant Ser as JsonApiSerializer
     participant Inc as JsonApiIncludeResolver
 
     Client->>REST: GET /accounts/{id}?include=parent
     activate REST
     REST->>REST: negotiate(Accept)
-    REST->>REST: segmentsOf(uri) → [accounts, id]
-    REST->>Svc: handle("GET", segments, params)
+    REST->>REST: segmentsOf(uri) -> [accounts, id]
+    REST->>Svc: handle GET, segments, params
     activate Svc
 
-    Svc->>Reg: forType("accounts")
+    Svc->>Reg: forType(accounts)
     Reg-->>Svc: config (404 if unknown)
     Svc->>Parser: parse(params, config)
-    Parser-->>Svc: JsonApiQueryOptions (400 if bad sort/filter/include/extend)
+    Parser-->>Svc: QueryOptions (400 if invalid param)
 
     Svc->>Builder: buildSingleQuery(id)
     Builder-->>Svc: soql + binds
     Svc->>DB: queryWithBinds(soql, binds)
     DB-->>Svc: SObject (404 if none)
     Svc->>Ser: toResource(record, config, options)
-    Ser-->>Svc: JsonApiResourceObject (data)
+    Ser-->>Svc: ResourceObject (data)
 
     opt include requested
         Svc->>Inc: resolve(records, config, options)
-        Inc->>DB: queryWithBinds(related WHERE Id IN :ids)
+        Inc->>DB: queryWithBinds(related WHERE Id IN ids)
         DB-->>Inc: related SObjects
-        Inc->>Ser: toResource(...) per related record
-        Inc-->>Svc: included[] (deduped by type:id)
+        Inc->>Ser: toResource per related record
+        Inc-->>Svc: included list (deduped by type+id)
     end
 
     Svc-->>REST: JsonApiResponse(200, document)
@@ -145,8 +145,12 @@ sequenceDiagram
     REST-->>Client: 200 application/vnd.api+json
     deactivate REST
 
-    Note over REST: Any JsonApiException → error document<br/>with its HTTP status (400/404/405/406);<br/>anything else → 500
+    Note over REST: JsonApiException is caught and rendered as an error<br/>document with its status 400/404/405/406, any other error becomes 500
 ```
+
+_(If your viewer doesn't render Mermaid, see the exported
+[request-sequence.svg](img/request-sequence.svg) /
+[request-sequence.png](img/request-sequence.png).)_
 
 For a **collection** request the single-record query is replaced by
 `buildCollectionQuery()` + `buildCountQuery()` (the latter feeds `meta.total` and
