@@ -46,7 +46,7 @@ Everything is served under `/services/apexrest/jsonapi`.
 
 | Parameter            | Example                              | Notes                                   |
 |----------------------|--------------------------------------|-----------------------------------------|
-| `include`            | `?include=parent,contacts`           | Comma-separated; supports nested paths (`contacts.account`) |
+| `include`            | `?include=parent,contacts`           | Comma-separated; nested paths (`contacts.account`); max 10 paths, depth 3 |
 | `extend`             | `?extend=financials,contactInfo`     | Comma-separated attribute **groups** to add on top of `base` |
 | `fields[TYPE]`       | `?fields[accounts]=name,phone`       | Sparse fieldsets, per type (takes precedence over `extend`) |
 | `sort`               | `?sort=-annualRevenue,name`          | `-` prefix = descending                 |

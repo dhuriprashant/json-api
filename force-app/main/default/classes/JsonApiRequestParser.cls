@@ -81,6 +81,13 @@ public with sharing class JsonApiRequestParser {
             if (String.isBlank(trimmed)) {
                 continue;
             }
+            // Cap nesting depth to bound the number of queries the resolver runs.
+            if (trimmed.countMatches('.') + 1 > JsonApiConstants.MAX_INCLUDE_DEPTH) {
+                throw JsonApiException.badRequest(
+                    'Include path "' + trimmed + '" is nested deeper than the limit of ' +
+                    JsonApiConstants.MAX_INCLUDE_DEPTH + '.',
+                    JsonApiErrorSource.forParameter(JsonApiConstants.PARAM_INCLUDE));
+            }
             // Validate only the first path segment against the primary config;
             // nested segments are resolved by the include resolver.
             String head = trimmed.contains('.') ? trimmed.substringBefore('.') : trimmed;
@@ -90,6 +97,12 @@ public with sharing class JsonApiRequestParser {
                     JsonApiErrorSource.forParameter(JsonApiConstants.PARAM_INCLUDE));
             }
             opts.includePaths.add(trimmed);
+        }
+
+        if (opts.includePaths.size() > JsonApiConstants.MAX_INCLUDE_PATHS) {
+            throw JsonApiException.badRequest(
+                'Too many include paths (limit ' + JsonApiConstants.MAX_INCLUDE_PATHS + ').',
+                JsonApiErrorSource.forParameter(JsonApiConstants.PARAM_INCLUDE));
         }
     }
 

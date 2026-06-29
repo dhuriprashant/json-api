@@ -47,6 +47,28 @@ private class JsonApiCoverageTest {
         System.assert(types.contains('accounts'), 'nested account side-loaded');
     }
 
+    @IsTest
+    static void includePathsWithSharedPrefixAreCoalesced() {
+        Id acctId = [SELECT Id FROM Account WHERE Name = 'Acme' LIMIT 1].Id;
+
+        // 'contacts' appears as both a leaf and the prefix of 'contacts.account';
+        // the resolver must fetch contacts ONCE, not once per path.
+        Integer before = Limits.getQueries();
+        JsonApiResponse r = new JsonApiService().handle('GET',
+            new List<String>{ 'accounts', acctId },
+            new Map<String, String>{ 'include' => 'contacts,contacts.account' });
+        Integer used = Limits.getQueries() - before;
+
+        System.assertEquals(200, r.statusCode);
+        // primary account + contacts + contacts' account = 3 queries (no duplicate contacts query).
+        System.assert(used <= 3, 'expected <=3 SOQL, got ' + used);
+        Set<String> types = new Set<String>();
+        for (JsonApiResourceObject obj : r.document.included) {
+            types.add(obj.type);
+        }
+        System.assert(types.contains('contacts') && types.contains('accounts'));
+    }
+
     // ---- Document model helpers ----
 
     @IsTest

@@ -52,6 +52,19 @@ private class JsonApiRestResourceTest {
         System.assertEquals(406, RestContext.response.statusCode);
     }
 
+    private class FakeException extends Exception {}
+
+    @IsTest
+    static void internalErrorDoesNotLeakDetails() {
+        List<JsonApiError> errors =
+            JsonApiRestResource.internalError(new FakeException('SECRET stack trace detail'));
+
+        System.assertEquals(1, errors.size());
+        System.assertEquals('500', errors[0].status);
+        System.assert(!errors[0].detail.contains('SECRET'), 'must not leak the raw message');
+        System.assert(errors[0].detail.contains('Reference:'), 'should include a support reference');
+    }
+
     @IsTest
     static void segmentsAreExtractedAfterBase() {
         List<String> segments = JsonApiRestResource.segmentsOf(

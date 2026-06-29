@@ -243,7 +243,8 @@ from the *key* with the regex `^(\w+)\[([^\]]+)\]$`:
 - `sort` / `filter` attributes must exist in the config → else `400` with a
   `source.parameter`. This guarantees only known fields reach the SOQL builder.
 - `include` validates the **first** path segment; deeper segments are validated by
-  the include resolver as it descends.
+  the include resolver as it descends. Paths deeper than `MAX_INCLUDE_DEPTH` or
+  more than `MAX_INCLUDE_PATHS` of them → `400` (bounds compound-document cost).
 - `extend` group names must exist on the primary config → else `400`; the `base`
   group is implicit and silently skipped if named.
 - `page[...]` values must be non-negative integers; size is clamped to
@@ -302,17 +303,22 @@ Sorting maps each `SortField` to `field ASC|DESC NULLS LAST`.
 
 ## 7. Include resolution (`JsonApiIncludeResolver`)
 
-Compound documents are built with a **breadth-first, one-level-per-step bulk
-query** strategy rather than SOQL subqueries/dot-traversal. For each `include`
-path (e.g. `contacts.account`):
+Compound documents are built by first **coalescing all `include` paths into a
+prefix tree**, then walking the tree with a **one-level-per-step bulk query**
+strategy (no SOQL subqueries/dot-traversal). Coalescing means a shared prefix is
+queried once — `contacts.account` and `contacts.cases` fetch `contacts` a single
+time.
 
 ```
-resolvePath(parents, parentConfig, segments, idx):
-    def        = parentConfig.relationshipFor(segments[idx])   // 400 if unknown
-    targetCfg  = Registry.forType(def.targetType)
-    related    = fetchRelated(parents, def, targetCfg)         // ONE bulk query
-    for r in related: included[type:id] = serialize(r)        // dedupe by key
-    resolvePath(related, targetCfg, segments, idx+1)           // descend
+buildTree(paths):  fold dotted paths into nested {relName -> node}
+
+walk(parents, parentConfig, node):
+    for relName in node.children:
+        def       = parentConfig.relationshipFor(relName)     // 400 if unknown
+        targetCfg = Registry.forType(def.targetType)
+        related   = fetchRelated(parents, def, targetCfg)     // ONE bulk query
+        for r in related: included[type:id] = serialize(r)    // dedupe by key
+        walk(related, targetCfg, node.children[relName])      // descend once
 ```
 
 `fetchRelated`:
@@ -320,8 +326,10 @@ resolvePath(parents, parentConfig, segments, idx):
 - **to-many:** gather parent Ids, then `… WHERE childForeignKeyField IN :ids`.
 
 Properties:
-- **Bulk-safe:** one query per path segment regardless of parent count (governor
-  friendly).
+- **Bulk-safe:** one query per relationship per level regardless of parent count;
+  shared prefixes are never re-queried (governor friendly).
+- **Bounded:** the parser caps paths at `MAX_INCLUDE_PATHS` and depth at
+  `MAX_INCLUDE_DEPTH`, so the query count has a hard ceiling.
 - **Deduplicated:** `included` is keyed by `type:id`, so a resource referenced by
   many parents appears once (spec requirement).
 - **Sparse-aware:** related records honor `fields[targetType]`.
@@ -372,6 +380,11 @@ methods (`badRequest`, `notFound`, `notAcceptable`, `methodNotAllowed`,
                 "detail": "Cannot sort by unknown attribute \"foo\".",
                 "source": { "parameter": "sort" } } ] }
 ```
+
+Unexpected (non-`JsonApiException`) errors become a `500` whose `detail` is
+**redacted**: `internalError()` logs the real message + stack server-side under a
+short random reference and returns only `"…Reference: <id>"` to the client — no
+internals leak.
 
 | Condition | Status |
 |-----------|--------|

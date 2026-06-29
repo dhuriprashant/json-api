@@ -34,4 +34,8 @@ public with sharing class JsonApiConstants {
 
     /** SOQL OFFSET is hard-capped by the platform at 2000. */
     public static final Integer MAX_OFFSET = 2000;
+
+    /** Guards against runaway compound documents (SOQL/CPU). */
+    public static final Integer MAX_INCLUDE_PATHS = 10;
+    public static final Integer MAX_INCLUDE_DEPTH = 3;
 }

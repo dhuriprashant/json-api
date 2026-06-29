@@ -1,8 +1,10 @@
 /**
  * Resolves `include` paths into a deduplicated list of related resource objects
- * for the document's top-level `included` member. Supports multi-segment paths
- * (e.g. "contacts.account") by walking one relationship at a time and querying
- * each level in bulk.
+ * for the document's top-level `included` member.
+ *
+ * Paths are coalesced into a tree first, so a shared prefix is queried only once
+ * (e.g. `contacts.account` and `contacts.cases` fetch `contacts` a single time),
+ * and each relationship level is queried in bulk for all accumulated parents.
  * @see https://jsonapi.org/format/#fetching-includes
  */
 public with sharing class JsonApiIncludeResolver {
@@ -13,46 +15,65 @@ public with sharing class JsonApiIncludeResolver {
         this.serializer = serializer;
     }
 
+    /** A node in the coalesced include tree: relationship name -> sub-paths. */
+    private class Node {
+        Map<String, Node> children = new Map<String, Node>();
+    }
+
     public List<JsonApiResourceObject> resolve(
         List<SObject> primary,
         JsonApiResourceConfig primaryConfig,
         JsonApiQueryOptions options
     ) {
+        Node root = buildTree(options.includePaths);
         Map<String, JsonApiResourceObject> includedByKey =
             new Map<String, JsonApiResourceObject>();
-        for (String path : options.includePaths) {
-            resolvePath(primary, primaryConfig, path.split('\\.'), 0, options, includedByKey);
-        }
+        walk(primary, primaryConfig, root, options, includedByKey);
         return includedByKey.values();
     }
 
-    private void resolvePath(
+    /** Folds the list of dotted paths into a prefix tree. */
+    private Node buildTree(List<String> paths) {
+        Node root = new Node();
+        for (String path : paths) {
+            Node cursor = root;
+            for (String segment : path.split('\\.')) {
+                if (!cursor.children.containsKey(segment)) {
+                    cursor.children.put(segment, new Node());
+                }
+                cursor = cursor.children.get(segment);
+            }
+        }
+        return root;
+    }
+
+    /** One bulk query per relationship per level, deduped by `type:id`. */
+    private void walk(
         List<SObject> parents,
         JsonApiResourceConfig parentConfig,
-        List<String> segments,
-        Integer idx,
+        Node node,
         JsonApiQueryOptions options,
         Map<String, JsonApiResourceObject> acc
     ) {
-        if (idx >= segments.size() || parents.isEmpty()) {
+        if (parents.isEmpty() || node.children.isEmpty()) {
             return;
         }
-        JsonApiRelationshipDef def = parentConfig.relationshipFor(segments[idx]);
-        if (def == null) {
-            throw JsonApiException.badRequest(
-                'Cannot include unknown relationship "' + segments[idx] + '".',
-                JsonApiErrorSource.forParameter(JsonApiConstants.PARAM_INCLUDE));
-        }
+        for (String relName : node.children.keySet()) {
+            JsonApiRelationshipDef def = parentConfig.relationshipFor(relName);
+            if (def == null) {
+                throw JsonApiException.badRequest(
+                    'Cannot include unknown relationship "' + relName + '".',
+                    JsonApiErrorSource.forParameter(JsonApiConstants.PARAM_INCLUDE));
+            }
+            JsonApiResourceConfig targetConfig = JsonApiRegistry.forType(def.targetType);
+            List<SObject> related = fetchRelated(parents, def, targetConfig, options);
 
-        JsonApiResourceConfig targetConfig = JsonApiRegistry.forType(def.targetType);
-        List<SObject> related = fetchRelated(parents, def, targetConfig, options);
-
-        for (SObject r : related) {
-            JsonApiResourceObject obj = serializer.toResource(r, targetConfig, options);
-            acc.put(obj.key(), obj);
+            for (SObject r : related) {
+                JsonApiResourceObject obj = serializer.toResource(r, targetConfig, options);
+                acc.put(obj.key(), obj);
+            }
+            walk(related, targetConfig, node.children.get(relName), options, acc);
         }
-        // Walk to the next segment using the records we just fetched as parents.
-        resolvePath(related, targetConfig, segments, idx + 1, options, acc);
     }
 
     private List<SObject> fetchRelated(

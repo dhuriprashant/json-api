@@ -81,6 +81,21 @@ private class JsonApiRequestParserTest {
     }
 
     @IsTest
+    static void rejectsTooDeepIncludePath() {
+        // 'parent' is a valid self-referential relationship on accounts.
+        assertBadRequest(new Map<String, String>{ 'include' => 'parent.parent.parent.parent' });
+    }
+
+    @IsTest
+    static void rejectsTooManyIncludePaths() {
+        List<String> paths = new List<String>();
+        for (Integer i = 0; i <= JsonApiConstants.MAX_INCLUDE_PATHS; i++) {
+            paths.add('parent');
+        }
+        assertBadRequest(new Map<String, String>{ 'include' => String.join(paths, ',') });
+    }
+
+    @IsTest
     static void rejectsUnknownFilterAttribute() {
         assertBadRequest(new Map<String, String>{ 'filter[bogus]' => 'x' });
     }

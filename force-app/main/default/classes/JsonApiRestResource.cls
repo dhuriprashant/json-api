@@ -26,13 +26,27 @@ global with sharing class JsonApiRestResource {
         } catch (JsonApiException e) {
             writeError(res, e.httpStatus, e.errors);
         } catch (Exception e) {
-            writeError(res, 500, new List<JsonApiError>{
-                new JsonApiError(500, 'INTERNAL_ERROR', 'Internal Server Error', e.getMessage())
-            });
+            writeError(res, 500, internalError(e));
         }
     }
 
     // ---------------------------------------------------------------------
+
+    /**
+     * Builds a 500 error that does NOT leak internals to the client. The full
+     * message + stack are logged server-side under a short reference the client
+     * can quote to support; the response carries only that reference.
+     */
+    @TestVisible
+    private static List<JsonApiError> internalError(Exception e) {
+        String ref = EncodingUtil.convertToHex(Crypto.generateAesKey(128)).substring(0, 8);
+        System.debug(LoggingLevel.ERROR,
+            'JSON:API 500 [' + ref + ']: ' + e.getMessage() + '\n' + e.getStackTraceString());
+        return new List<JsonApiError>{
+            new JsonApiError(500, 'INTERNAL_ERROR', 'Internal Server Error',
+                'An unexpected error occurred. Reference: ' + ref)
+        };
+    }
 
     /**
      * Enforces JSON:API content negotiation: if the Accept header names the
