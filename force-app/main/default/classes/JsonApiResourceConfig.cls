@@ -23,6 +23,7 @@ public abstract class JsonApiResourceConfig {
     private Map<String, String> memoFieldToAttr;
     private Set<String> memoAttrFields;
     private Map<String, JsonApiRelationshipDef> memoRels;
+    private Map<String, Schema.SObjectField> memoFieldMap;
 
     /** The JSON:API `type` for this resource, e.g. "accounts". */
     public abstract String getType();
@@ -150,6 +151,19 @@ public abstract class JsonApiResourceConfig {
 
     public JsonApiRelationshipDef relationshipFor(String name) {
         return relationships().get(name);
+    }
+
+    /**
+     * Memoized SObject field describe map (lower-cased field API name -> token).
+     * The query builder is instantiated several times per request (collection,
+     * count, each related collection); memoizing here on the singleton config
+     * means the {@code getDescribe()} call happens once per type per transaction.
+     */
+    public Map<String, Schema.SObjectField> fieldMap() {
+        if (memoFieldMap == null) {
+            memoFieldMap = getSObjectType().getDescribe().fields.getMap();
+        }
+        return memoFieldMap;
     }
 
     /** Memoizes the result of {@link #getAttributeGroups()} — called at most once. */

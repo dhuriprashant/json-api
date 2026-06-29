@@ -13,14 +13,12 @@ public with sharing class JsonApiQueryBuilder {
     private final JsonApiResourceConfig config;
     private final JsonApiQueryOptions options;
     private Integer bindCounter = 0;
-    private Map<String, Schema.SObjectField> fieldMap;
     private String cachedWhere;
     private Boolean whereBuilt = false;
 
     public JsonApiQueryBuilder(JsonApiResourceConfig config, JsonApiQueryOptions options) {
         this.config = config;
         this.options = options == null ? new JsonApiQueryOptions() : options;
-        this.fieldMap = config.getSObjectType().getDescribe().fields.getMap();
     }
 
     public String buildCollectionQuery() {
@@ -120,7 +118,7 @@ public with sharing class JsonApiQueryBuilder {
 
     /** Coerces a string filter value into the field's native type for binding. */
     private Object coerce(String fieldApiName, String value) {
-        Schema.SObjectField field = fieldMap.get(fieldApiName.toLowerCase());
+        Schema.SObjectField field = config.fieldMap().get(fieldApiName.toLowerCase());
         if (field == null || value == null) {
             return value;
         }
