@@ -175,7 +175,11 @@ public with sharing class OpportunityResourceConfig extends JsonApiResourceConfi
 That's it — the new type is live at `/services/apexrest/jsonapi/opportunities`.
 `JsonApiBootstrap` reads all active `JsonApiResource__mdt` records on first use and
 instantiates each `Apex_Class__c` via reflection. Uncheck `Is_Active__c` to disable
-an endpoint without deleting the record.
+an endpoint without deleting the record. Registration is fault-isolated: a record
+pointing at a missing or invalid class is **skipped** (the reason is logged at
+`ERROR` and recorded in `JsonApiBootstrap.getRegistrationErrors()`) so one bad
+record can't take down the other endpoints — a request for the skipped type just
+gets a clean `404`.
 
 ---
 

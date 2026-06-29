@@ -14,10 +14,33 @@ public with sharing class JsonApiBootstrap {
     @TestVisible
     private static List<JsonApiResource__mdt> configOverride;
 
+    /** DeveloperName -> reason, for any CMDT record that failed to load. */
+    private static Map<String, String> registrationErrors = new Map<String, String>();
+
     public static void registerAll() {
+        registrationErrors = new Map<String, String>();
         for (JsonApiResource__mdt record : loadConfigRecords()) {
-            JsonApiRegistry.register(instantiate(record.Apex_Class__c, record.DeveloperName));
+            try {
+                JsonApiRegistry.register(instantiate(record.Apex_Class__c, record.DeveloperName));
+            } catch (Exception e) {
+                // One misconfigured record must not take down every endpoint:
+                // skip it, remember why, and keep loading the rest. A later
+                // lookup for the skipped type then returns a clean 404 instead
+                // of a 500 that also breaks every healthy resource.
+                registrationErrors.put(record.DeveloperName, e.getMessage());
+                System.debug(LoggingLevel.ERROR,
+                    'JSON:API: skipping resource "' + record.DeveloperName + '" - ' + e.getMessage());
+            }
         }
+    }
+
+    /**
+     * DeveloperName -> failure reason for every CMDT record that could not be
+     * loaded on the last {@link #registerAll}. Empty when all records loaded.
+     * Useful for a health check or admin diagnostics.
+     */
+    public static Map<String, String> getRegistrationErrors() {
+        return registrationErrors.clone();
     }
 
     private static List<JsonApiResource__mdt> loadConfigRecords() {

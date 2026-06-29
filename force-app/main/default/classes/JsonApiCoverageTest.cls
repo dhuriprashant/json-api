@@ -94,31 +94,46 @@ private class JsonApiCoverageTest {
     }
 
     @IsTest
-    static void bootstrapRejectsUnknownApexClass() {
+    static void bootstrapSkipsBadRecordButLoadsGoodOnes() {
+        // A bad record alongside a healthy one must not take the good one down.
+        JsonApiBootstrap.configOverride = new List<JsonApiResource__mdt>{
+            new JsonApiResource__mdt(DeveloperName = 'Accounts', Apex_Class__c = 'AccountResourceConfig', Is_Active__c = true),
+            new JsonApiResource__mdt(DeveloperName = 'Bad', Apex_Class__c = 'NoSuchClass__X', Is_Active__c = true)
+        };
+        JsonApiRegistry.reset();
+
+        System.assert(JsonApiRegistry.isRegistered('accounts'), 'good record loaded despite a bad sibling');
+        Map<String, String> errors = JsonApiBootstrap.getRegistrationErrors();
+        System.assert(errors.containsKey('Bad'), 'bad record captured: ' + errors);
+    }
+
+    @IsTest
+    static void bootstrapSkipsUnknownApexClassWithCleanNotFound() {
         JsonApiBootstrap.configOverride = new List<JsonApiResource__mdt>{
             new JsonApiResource__mdt(DeveloperName = 'Bad', Apex_Class__c = 'NoSuchClass__X', Is_Active__c = true)
         };
         JsonApiRegistry.reset();
+
+        // The skipped type resolves to a 404, not a 500.
         try {
             JsonApiRegistry.forType('accounts');
-            System.assert(false, 'expected configuration exception');
+            System.assert(false, 'expected not-found');
         } catch (JsonApiException e) {
-            System.assertEquals(500, e.httpStatus);
+            System.assertEquals(404, e.httpStatus);
         }
+        System.assert(JsonApiBootstrap.getRegistrationErrors().containsKey('Bad'));
     }
 
     @IsTest
-    static void bootstrapRejectsNonConfigClass() {
+    static void bootstrapSkipsNonConfigClass() {
         // A real class that exists but does not extend JsonApiResourceConfig.
         JsonApiBootstrap.configOverride = new List<JsonApiResource__mdt>{
             new JsonApiResource__mdt(DeveloperName = 'Bad', Apex_Class__c = 'JsonApiConstants', Is_Active__c = true)
         };
         JsonApiRegistry.reset();
-        try {
-            JsonApiRegistry.forType('accounts');
-            System.assert(false, 'expected configuration exception');
-        } catch (JsonApiException e) {
-            System.assertEquals(500, e.httpStatus);
-        }
+        JsonApiRegistry.isRegistered('accounts'); // force lazy initialization
+
+        System.assert(JsonApiBootstrap.getRegistrationErrors().containsKey('Bad'),
+            'non-config class recorded as a registration error');
     }
 }
