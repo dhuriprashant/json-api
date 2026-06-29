@@ -19,25 +19,25 @@ sf project deploy start -d force-app -o <org>
 # Validate without saving (compiles + runs this framework's tests, persists nothing)
 sf project deploy validate -d force-app -o <org> -l RunSpecifiedTests `
   -t JsonApiServiceTest -t JsonApiRequestParserTest `
-  -t JsonApiRestResourceTest -t JsonApiCoverageTest
+  -t JsonApiRestResourceTest -t JsonApiCoverageTest -t JsonApiUnitTest
 
 # Run the test suite with coverage
 sf apex run test -o <org> -l RunSpecifiedTests -c `
   -t JsonApiServiceTest -t JsonApiRequestParserTest `
-  -t JsonApiRestResourceTest -t JsonApiCoverageTest
+  -t JsonApiRestResourceTest -t JsonApiCoverageTest -t JsonApiUnitTest
 
 # Run a single test class
 sf apex run test -o <org> -l RunSpecifiedTests -t JsonApiServiceTest -c
 ```
 
-The four test classes are `JsonApiServiceTest`, `JsonApiRequestParserTest`, `JsonApiRestResourceTest`, and `JsonApiCoverageTest`. The tests insert real `Account`/`Contact` records — a broken Account/Contact trigger in the target org will make them fail (an org problem, not a framework one). Validate in a clean scratch org.
+The test classes are `JsonApiServiceTest`, `JsonApiRequestParserTest`, `JsonApiRestResourceTest`, `JsonApiCoverageTest`, and `JsonApiUnitTest` (`JsonApiTestQueryGateway` is a shared `@IsTest` mock, not a runnable suite). `JsonApiUnitTest` and `JsonApiRequestParserTest` are **DML-free** (they use the in-memory `JsonApiQueryGateway` / no SObjects) and run even in orgs with broken triggers; the other three insert real `Account`/`Contact` records, so a broken Account/Contact trigger in the target org will fail them (an org problem, not a framework one). Validate the full suite in a clean scratch org.
 
 ## Request flow
 
 A request walks one path through the layers; understanding this sequence is the fastest way to orient:
 
 1. **`JsonApiRestResource`** (`@RestResource(urlMapping='/jsonapi/*')`) — the only HTTP entry point. Handles HTTP concerns only: content negotiation (enforces the `application/vnd.api+json` media type → 415/406), splits the URI into path segments after the `jsonapi` base, catches exceptions and renders them. Delegates everything else to the service.
-2. **`JsonApiService`** — the orchestration core. Contains the routing table (maps verb + segment shape to an operation) and runs all SOQL/DML in `AccessLevel.USER_MODE`.
+2. **`JsonApiService`** — the orchestration core. Contains the routing table (maps verb + segment shape to an operation). All data access goes through a `JsonApiQueryGateway` (default `JsonApiUserModeGateway`, which runs every query in `AccessLevel.USER_MODE`); a `@TestVisible` constructor accepts an in-memory gateway for DML-free unit tests.
 3. **`JsonApiRegistry` / `JsonApiBootstrap`** — `forType(type)` resolves the JSON:API type string to its config, throwing 404 if unregistered. The registry lazily self-initializes by calling `JsonApiBootstrap.registerAll()` on first lookup.
 4. **`JsonApiRequestParser` → `JsonApiQueryOptions`** — parses query params (`include`, `fields[]`, `sort`, `filter[]`, `page[]`, `extend`) into a typed options object. `extend` names attribute groups to add on top of the always-returned `base` group.
 5. **`JsonApiQueryBuilder`** — builds SOQL strings + a `binds` map from config + options. All field/object names come from configs (never user input); all filter values are bind variables — no SOQL injection.

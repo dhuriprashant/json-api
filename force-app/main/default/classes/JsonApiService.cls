@@ -18,6 +18,18 @@
 public with sharing class JsonApiService {
 
     private final JsonApiSerializer serializer = new JsonApiSerializer(JsonApiConstants.BASE_PATH);
+    private final JsonApiQueryGateway gateway;
+
+    /** Production entry point — queries run in USER_MODE. */
+    public JsonApiService() {
+        this(new JsonApiUserModeGateway());
+    }
+
+    /** Injection point for tests to supply an in-memory gateway. */
+    @TestVisible
+    private JsonApiService(JsonApiQueryGateway gateway) {
+        this.gateway = gateway;
+    }
 
     public JsonApiResponse handle(
         String method,
@@ -67,13 +79,12 @@ public with sharing class JsonApiService {
 
     private JsonApiResponse getCollection(JsonApiResourceConfig config, JsonApiQueryOptions options) {
         JsonApiQueryBuilder builder = new JsonApiQueryBuilder(config, options);
-        List<SObject> records = Database.queryWithBinds(
-            builder.buildCollectionQuery(), builder.binds, AccessLevel.USER_MODE);
+        List<SObject> records = gateway.query(builder.buildCollectionQuery(), builder.binds);
 
         JsonApiDocument doc = JsonApiDocument.ofData(serializer.toResources(records, config, options));
         addIncluded(doc, records, config, options);
 
-        Integer total = Database.countQueryWithBinds(builder.buildCountQuery(), builder.binds, AccessLevel.USER_MODE);
+        Integer total = gateway.countQuery(builder.buildCountQuery(), builder.binds);
         doc.meta = new Map<String, Object>{ 'total' => total };
         doc.links = paginationLinks(config, options, builder, total);
         return new JsonApiResponse(200, doc);
@@ -155,8 +166,7 @@ public with sharing class JsonApiService {
         }
         JsonApiQueryBuilder builder = new JsonApiQueryBuilder(config, options);
         Id recordId = (Id) id;
-        List<SObject> records = Database.queryWithBinds(
-            builder.buildSingleQuery(recordId), builder.binds, AccessLevel.USER_MODE);
+        List<SObject> records = gateway.query(builder.buildSingleQuery(recordId), builder.binds);
         return records.isEmpty() ? null : records[0];
     }
 
@@ -172,7 +182,7 @@ public with sharing class JsonApiService {
         Map<String, Object> binds = builder.binds.clone();
         binds.put('parentId', (Id) parentId);
         soql = injectWhere(soql, def.childForeignKeyField + ' = :parentId');
-        return Database.queryWithBinds(soql, binds, AccessLevel.USER_MODE);
+        return gateway.query(soql, binds);
     }
 
     /** Inserts (or ANDs) a clause into an already-built SOQL string. */
@@ -200,7 +210,7 @@ public with sharing class JsonApiService {
             return;
         }
         List<JsonApiResourceObject> included =
-            new JsonApiIncludeResolver(serializer).resolve(records, config, options);
+            new JsonApiIncludeResolver(serializer, gateway).resolve(records, config, options);
         if (!included.isEmpty()) {
             doc.included = included;
         }

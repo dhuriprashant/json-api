@@ -10,9 +10,11 @@
 public with sharing class JsonApiIncludeResolver {
 
     private final JsonApiSerializer serializer;
+    private final JsonApiQueryGateway gateway;
 
-    public JsonApiIncludeResolver(JsonApiSerializer serializer) {
+    public JsonApiIncludeResolver(JsonApiSerializer serializer, JsonApiQueryGateway gateway) {
         this.serializer = serializer;
+        this.gateway = gateway;
     }
 
     /** A node in the coalesced include tree: relationship name -> sub-paths. */
@@ -113,7 +115,7 @@ public with sharing class JsonApiIncludeResolver {
             soql = 'SELECT ' + fields + ' FROM ' + objectName + ' WHERE Id IN :ids';
         }
 
-        return Database.queryWithBinds(soql, binds, AccessLevel.USER_MODE);
+        return gateway.query(soql, binds);
     }
 
     /** Mirrors the builder's field selection for related resources. */

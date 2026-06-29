@@ -69,7 +69,8 @@ reference, see [`JSON-API-README.md`](../force-app/main/default/classes/JSON-API
 | Parsing | `JsonApiRequestParser` | Raw params → validated `JsonApiQueryOptions`. |
 | Parsing | `JsonApiQueryOptions` | Typed `include` / `fields` / `sort` / `filter` / `page` (+ inner `SortField`). |
 | Data | `JsonApiQueryBuilder` | Generates parameterized SOQL (collection / single / count) + a `binds` map. |
-| Data | `JsonApiIncludeResolver` | Walks `include` paths and bulk-queries related records for the `included` array. |
+| Data | `JsonApiIncludeResolver` | Coalesces `include` paths into a tree and bulk-queries related records for the `included` array. |
+| Data | `JsonApiQueryGateway` / `JsonApiUserModeGateway` | The DB seam: interface over query execution; the production impl runs everything in `USER_MODE`. Swappable for an in-memory test double. |
 | Serialization | `JsonApiSerializer` | SObject → `JsonApiResourceObject` (attributes, to-one linkage, links). |
 | Model | `JsonApiDocument`, `JsonApiResourceObject`, `JsonApiResourceIdentifier`, `JsonApiRelationship`, `JsonApiError`, `JsonApiErrorSource` | The JSON:API document object model. |
 | Errors | `JsonApiException` | Carries HTTP status + `errors[]`; factory methods per status. |
@@ -357,7 +358,7 @@ absent members, matching JSON:API's "absent vs present" semantics for optional k
 
 | Concern | Mechanism |
 |---------|-----------|
-| CRUD / FLS | Every read uses `Database.queryWithBinds(..., AccessLevel.USER_MODE)`, so the platform enforces the running user's object and field permissions. |
+| CRUD / FLS | All reads go through `JsonApiUserModeGateway`, the only class that calls `Database`, which runs every query in `AccessLevel.USER_MODE` — so the platform enforces the running user's object and field permissions. |
 | SOQL injection | Identifiers are config-sourced; values are bind variables (see §6). |
 | Read-only | No DML path exists; non-GET verbs are rejected with `405`. |
 | Sharing | All worker classes are declared `with sharing`. |
@@ -426,28 +427,36 @@ Defaults/limits live in `JsonApiConstants` (`DEFAULT_PAGE_SIZE=25`,
 | Filter operators (`>`, `<`, `LIKE`, `IN`) | Extend `JsonApiQueryBuilder.computeWhere()` (and the parser to accept the syntax). |
 | Computed/virtual attributes | Override serialization for the type, or post-process the `JsonApiResourceObject`. |
 | Per-resource toggles / extra config | Add fields to `JsonApiResource__mdt` and read them in `JsonApiBootstrap`. |
-| Custom auth / rate limiting | Add checks in `JsonApiRestResource.dispatch()` before delegating. |
+| Custom auth / rate limiting | Add checks in `JsonApiRestResource.doGet()` before delegating. |
+| Swap the data source (e.g. mock, cache, cross-org) | Implement `JsonApiQueryGateway` and inject it into `JsonApiService`. |
 | To-many linkage inlined in primary `data` | Populate `relationships[name].data` during serialization by querying children. |
 
 ---
 
 ## 13. Testing strategy
 
-Tests exercise the stack at two levels so the core is verifiable without HTTP:
+Tests run at two levels — **fast DML-free unit tests** plus DML-backed
+integration tests:
 
-| Test class | Focus |
-|------------|-------|
-| `JsonApiRequestParserTest` | Param parsing + validation rejections (no DML). |
-| `JsonApiServiceTest` | GET operations — collection, single, include, sparse, `extend`, sort/filter, pagination, related/linkage endpoints, error statuses (incl. non-GET → 405) — via `JsonApiService.handle()` directly. |
-| `JsonApiRestResourceTest` | HTTP layer: `RestContext` plumbing, content negotiation (406), error rendering, `segmentsOf` URI parsing. |
-| `JsonApiCoverageTest` | Config helpers, nested include, document-model helpers, CMDT-driven registration. |
+| Test class | DML? | Focus |
+|------------|------|-------|
+| `JsonApiUnitTest` | No | Read/serialize/include pipeline driven by an in-memory `JsonApiTestQueryGateway` with fabricated SObjects — runs anywhere, even orgs with broken triggers. |
+| `JsonApiRequestParserTest` | No | Param parsing + validation rejections. |
+| `JsonApiServiceTest` | Yes | GET operations — collection, single, include, sparse, `extend`, sort/filter, pagination, related/linkage endpoints, error statuses (incl. non-GET → 405) — via `JsonApiService.handle()`. |
+| `JsonApiRestResourceTest` | Yes | HTTP layer: `RestContext` plumbing, content negotiation (406), error rendering, `internalError` redaction, `segmentsOf`. |
+| `JsonApiCoverageTest` | Yes | Config helpers, nested/coalesced include, document-model helpers, CMDT-driven registration. |
+
+The DB seam (`JsonApiQueryGateway`) is what makes the unit tests possible: inject
+`JsonApiTestQueryGateway` via the `@TestVisible JsonApiService(gateway)`
+constructor and seed rows per SObjectType — no inserts, no org coupling.
 
 **Status:** all tests passing with healthy org-wide coverage (clean scratch org),
 and verified live over HTTP against a real org.
 
-> The tests insert real `Account`/`Contact` records, so a broken Account/Contact
-> trigger in the target org will fail them — an org problem, not a framework one.
-> Validate in a clean scratch org.
+> The DML-backed tests insert real `Account`/`Contact` records, so a broken
+> Account/Contact trigger in the target org will fail them — an org problem, not a
+> framework one. The DML-free `JsonApiUnitTest`/`JsonApiRequestParserTest` run
+> regardless; validate the full suite in a clean scratch org.
 
 ---
 
