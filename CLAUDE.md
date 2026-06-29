@@ -42,7 +42,7 @@ A request walks one path through the layers; understanding this sequence is the 
 4. **`JsonApiRequestParser` → `JsonApiQueryOptions`** — parses query params (`include`, `fields[]`, `sort`, `filter[]`, `page[]`, `extend`) into a typed options object. `extend` names attribute groups to add on top of the always-returned `base` group.
 5. **`JsonApiQueryBuilder`** — builds SOQL strings + a `binds` map from config + options. All field/object names come from configs (never user input); all filter values are bind variables — no SOQL injection.
 6. **`JsonApiSerializer` / `JsonApiIncludeResolver`** — convert SObjects → the document model. The include resolver populates the top-level `included` array.
-7. **Document model** — `JsonApiDocument`, `JsonApiResourceObject`, `JsonApiResourceIdentifier`, `JsonApiRelationship`, `JsonApiError`, `JsonApiErrorSource`. `JsonApiResponse` wraps status + headers + document.
+7. **Document model** — `JsonApiDocument`, `JsonApiResourceObject`, `JsonApiResourceIdentifier`, `JsonApiError`, `JsonApiErrorSource`. `JsonApiResponse` wraps status + headers + document. Relationship objects are plain `Map`s (not a typed class) so an empty to-one serializes as explicit `"data": null`; `JsonApiDocument.toJson()` builds the top level as a map for the same reason (JSON suppress-nulls drops null Apex fields but keeps null map entries).
 8. **`JsonApiException`** — typed errors with factory methods (`notFound`, `badRequest`, `conflict`, `unsupportedMediaType`, etc.) carrying HTTP status + JSON:API `errors[]`.
 
 `JsonApiConstants` holds the media type and `BASE_PATH`.

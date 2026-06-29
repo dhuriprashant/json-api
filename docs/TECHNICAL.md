@@ -72,7 +72,7 @@ reference, see [`JSON-API-README.md`](../force-app/main/default/classes/JSON-API
 | Data | `JsonApiIncludeResolver` | Coalesces `include` paths into a tree and bulk-queries related records for the `included` array. |
 | Data | `JsonApiQueryGateway` / `JsonApiUserModeGateway` | The DB seam: interface over query execution; the production impl runs everything in `USER_MODE`. Swappable for an in-memory test double. |
 | Serialization | `JsonApiSerializer` | SObject → `JsonApiResourceObject` (attributes, to-one linkage, links). |
-| Model | `JsonApiDocument`, `JsonApiResourceObject`, `JsonApiResourceIdentifier`, `JsonApiRelationship`, `JsonApiError`, `JsonApiErrorSource` | The JSON:API document object model. |
+| Model | `JsonApiDocument`, `JsonApiResourceObject`, `JsonApiResourceIdentifier`, `JsonApiError`, `JsonApiErrorSource` | The JSON:API document object model. |
 | Errors | `JsonApiException` | Carries HTTP status + `errors[]`; factory methods per status. |
 | Observability | `JsonApiObservability` / `JsonApiObserver` / `JsonApiRequestLog` / `JsonApiDebugObserver` | Per-request telemetry emitted at the HTTP boundary to a pluggable observer (default: structured debug log). |
 | Constants | `JsonApiConstants` | Media type, base path, param names, pagination limits. |
@@ -345,14 +345,24 @@ Properties:
 - `id` = `record.get('Id')`, `type` = config type;
 - attributes from `resolveAttributeNames(options)` (sparse `fields[]`, else base +
   `extend` groups);
-- relationships: every relationship gets `self`/`related` links; to-one
-  relationships also get `data` linkage from the stored lookup Id (or `null`);
+- relationships: each is a **`Map`** with `self`/`related` links; a to-one also
+  carries explicit `data` linkage — the identifier when set, or `null` when empty;
 - a `self` link.
 
-Output uses `JSON.serialize(doc, true)` — the `suppressApexObjectNulls` flag omits
-absent members, matching JSON:API's "absent vs present" semantics for optional keys.
+### Suppress-nulls vs. explicit `null`
 
-(The framework is read-only, so there is no inbound deserialization path.)
+Output uses `JSON.serialize(value, true)`, whose `suppressApexObjectNulls` flag
+omits absent members — but it only drops null **Apex-object fields**, *not* null
+**map entries**. JSON:API requires an empty to-one to serialize as `"data": null`
+(distinct from an absent member), so the two places that need an explicit null are
+modeled as maps rather than typed fields:
+- **relationship objects** are `Map<String,Object>` (so `data => null` survives);
+- **`JsonApiDocument.toJson()`** builds the top level as a map and always includes
+  `data` for a data document — so an empty relationship-linkage / related endpoint
+  returns `{"data": null}` rather than `{}`.
+
+Everything else stays a typed DTO and relies on suppress-nulls to omit optional
+members. (The framework is read-only — there is no inbound deserialization path.)
 
 ---
 

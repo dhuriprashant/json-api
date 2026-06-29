@@ -6,7 +6,14 @@ public class JsonApiResourceObject {
     public String type;
     public String id;
     public Map<String, Object> attributes;
-    public Map<String, JsonApiRelationship> relationships;
+    /**
+     * Relationship name -> relationship object (itself a Map with `links` and,
+     * for to-one, explicit `data` linkage). A Map is used rather than a typed
+     * class so that an empty to-one linkage serializes as `"data": null` — null
+     * map entries survive JSON suppress-nulls, whereas null Apex-object fields
+     * do not.
+     */
+    public Map<String, Object> relationships;
     public Map<String, Object> links;
     public Map<String, Object> meta;
 
@@ -27,9 +34,9 @@ public class JsonApiResourceObject {
         this.attributes.put(name, value);
     }
 
-    public void putRelationship(String name, JsonApiRelationship rel) {
+    public void putRelationship(String name, Map<String, Object> rel) {
         if (this.relationships == null) {
-            this.relationships = new Map<String, JsonApiRelationship>();
+            this.relationships = new Map<String, Object>();
         }
         this.relationships.put(name, rel);
     }

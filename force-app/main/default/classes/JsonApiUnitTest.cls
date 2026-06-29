@@ -150,4 +150,68 @@ private class JsonApiUnitTest {
         System.assertEquals('accounts', r.document.included[0].type);
         System.assertEquals(0, Limits.getDmlStatements());
     }
+
+    @IsTest
+    static void emptyToOneRelationshipSerializesExplicitNullData() {
+        Id accId = fakeId(Account.SObjectType, 1);
+        Account acc = new Account(Name = 'Acme'); // ParentId is null
+        acc.Id = accId;
+
+        JsonApiTestQueryGateway mock =
+            new JsonApiTestQueryGateway().seed(Account.SObjectType, new List<SObject>{ acc });
+
+        JsonApiResponse r = new JsonApiService(mock).handle(
+            'GET', new List<String>{ 'accounts', accId }, new Map<String, String>());
+
+        JsonApiResourceObject obj = (JsonApiResourceObject) r.document.data;
+        Map<String, Object> parentRel = (Map<String, Object>) obj.relationships.get('parent');
+        System.assert(parentRel.containsKey('data'), 'empty to-one must include data');
+        System.assertEquals(null, parentRel.get('data'), 'empty to-one data must be null');
+
+        // to-many linkage is NOT inlined → no data key.
+        Map<String, Object> contactsRel = (Map<String, Object>) obj.relationships.get('contacts');
+        System.assert(!contactsRel.containsKey('data'), 'to-many data is not inlined');
+
+        // And it survives serialization as an explicit null, not a dropped member.
+        System.assert(r.document.toJson().contains('"data":null'), r.document.toJson());
+    }
+
+    @IsTest
+    static void presentToOneRelationshipSerializesIdentifier() {
+        Id accId = fakeId(Account.SObjectType, 1);
+        Id parentId = fakeId(Account.SObjectType, 2);
+        Account acc = new Account(Name = 'Acme', ParentId = parentId);
+        acc.Id = accId;
+
+        JsonApiTestQueryGateway mock =
+            new JsonApiTestQueryGateway().seed(Account.SObjectType, new List<SObject>{ acc });
+
+        JsonApiResponse r = new JsonApiService(mock).handle(
+            'GET', new List<String>{ 'accounts', accId }, new Map<String, String>());
+
+        JsonApiResourceObject obj = (JsonApiResourceObject) r.document.data;
+        Map<String, Object> parentRel = (Map<String, Object>) obj.relationships.get('parent');
+        JsonApiResourceIdentifier ident = (JsonApiResourceIdentifier) parentRel.get('data');
+        System.assertEquals('accounts', ident.type);
+        System.assertEquals(parentId, (Id) ident.id);
+    }
+
+    @IsTest
+    static void emptyRelationshipLinkageEndpointEmitsNullData() {
+        Id accId = fakeId(Account.SObjectType, 1);
+        Account acc = new Account(Name = 'Acme'); // no parent
+        acc.Id = accId;
+
+        JsonApiTestQueryGateway mock =
+            new JsonApiTestQueryGateway().seed(Account.SObjectType, new List<SObject>{ acc });
+
+        JsonApiResponse r = new JsonApiService(mock).handle(
+            'GET', new List<String>{ 'accounts', accId, 'relationships', 'parent' },
+            new Map<String, String>());
+
+        System.assertEquals(200, r.statusCode);
+        System.assertEquals(null, r.document.data, 'empty linkage data is null');
+        System.assert(r.document.toJson().contains('"data":null'),
+            'top-level data must serialize as null, got ' + r.document.toJson());
+    }
 }

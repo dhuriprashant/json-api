@@ -189,7 +189,7 @@ an endpoint without deleting the record.
 | Request parsing  | `JsonApiRequestParser`, `JsonApiQueryOptions`                         |
 | Data access      | `JsonApiQueryBuilder`, `JsonApiIncludeResolver`, `JsonApiQueryGateway`, `JsonApiUserModeGateway` |
 | Serialization    | `JsonApiSerializer`                                                    |
-| Document model   | `JsonApiDocument`, `JsonApiResourceObject`, `JsonApiResourceIdentifier`, `JsonApiRelationship`, `JsonApiError`, `JsonApiErrorSource` |
+| Document model   | `JsonApiDocument`, `JsonApiResourceObject`, `JsonApiResourceIdentifier`, `JsonApiError`, `JsonApiErrorSource` |
 | Errors           | `JsonApiException`                                                     |
 | Observability    | `JsonApiObservability`, `JsonApiObserver`, `JsonApiRequestLog`, `JsonApiDebugObserver` |
 | Constants        | `JsonApiConstants`                                                     |

@@ -42,8 +42,33 @@ public class JsonApiDocument {
         this.included.add(resource);
     }
 
-    /** Serializes to a JSON string, omitting absent (null) members per the spec. */
+    /**
+     * Serializes to a JSON string. Absent members are omitted, but a data
+     * document's `data` is always present — emitted as `null` for an empty
+     * to-one (the spec distinguishes `"data": null` from an absent member).
+     *
+     * This is done via an explicit map because JSON suppress-nulls drops null
+     * Apex-object fields (like `data`) but preserves null map entries.
+     */
     public String toJson() {
-        return JSON.serialize(this, true);
+        Map<String, Object> out = new Map<String, Object>();
+        if (jsonapi != null) {
+            out.put('jsonapi', jsonapi);
+        }
+        if (errors != null) {
+            out.put('errors', errors);
+        } else {
+            out.put('data', data); // always present for a data document; null preserved
+        }
+        if (included != null) {
+            out.put('included', included);
+        }
+        if (meta != null) {
+            out.put('meta', meta);
+        }
+        if (links != null) {
+            out.put('links', links);
+        }
+        return JSON.serialize(out, true);
     }
 }

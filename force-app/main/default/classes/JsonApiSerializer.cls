@@ -53,24 +53,28 @@ public with sharing class JsonApiSerializer {
         return resource;
     }
 
-    private JsonApiRelationship buildRelationship(
+    private Map<String, Object> buildRelationship(
         SObject record,
         String parentId,
         String parentType,
         JsonApiRelationshipDef def
     ) {
-        JsonApiRelationship rel = JsonApiRelationship.withLinks(
-            resourceUrl(parentType, parentId) + '/relationships/' + def.name,
-            resourceUrl(parentType, parentId) + '/' + def.name
-        );
+        Map<String, Object> rel = new Map<String, Object>{
+            'links' => new Map<String, Object>{
+                'self' => resourceUrl(parentType, parentId) + '/relationships/' + def.name,
+                'related' => resourceUrl(parentType, parentId) + '/' + def.name
+            }
+        };
 
         if (!def.isToMany && def.lookupField != null) {
+            // Emit explicit linkage: an identifier when set, or `null` (spec
+            // requires null — not an absent member — for an empty to-one).
             Object lookupId = record.get(def.lookupField);
-            rel.data = lookupId == null
+            rel.put('data', lookupId == null
                 ? null
-                : new JsonApiResourceIdentifier(def.targetType, String.valueOf(lookupId));
+                : new JsonApiResourceIdentifier(def.targetType, String.valueOf(lookupId)));
         }
-        // to-many linkage is populated by the include resolver when requested.
+        // to-many linkage is exposed via the relationship endpoints, not inlined.
         return rel;
     }
 
