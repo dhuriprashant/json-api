@@ -61,6 +61,17 @@ private class JsonApiUnitTest {
     }
 
     @IsTest
+    static void errorSourceFactoriesSetTheRightMember() {
+        JsonApiErrorSource byPointer = JsonApiErrorSource.forPointer('/data/id');
+        System.assertEquals('/data/id', byPointer.pointer);
+        System.assertEquals(null, byPointer.parameter);
+
+        JsonApiErrorSource byParam = JsonApiErrorSource.forParameter('include');
+        System.assertEquals('include', byParam.parameter);
+        System.assertEquals(null, byParam.pointer);
+    }
+
+    @IsTest
     static void serializesSingleResourceWithoutDml() {
         Id accId = fakeId(Account.SObjectType, 1);
         Account acc = new Account(Name = 'Acme', Industry = 'Technology');
