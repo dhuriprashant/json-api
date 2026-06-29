@@ -18,15 +18,36 @@ global with sharing class JsonApiRestResource {
         RestResponse res = RestContext.response;
         res.addHeader('Content-Type', JsonApiConstants.MEDIA_TYPE);
 
+        Long start = System.now().getTime();
+        Integer queriesBefore = Limits.getQueries();
+        List<String> segments = segmentsOf(req.requestURI);
+
+        JsonApiRequestLog log = new JsonApiRequestLog();
+        log.method = 'GET';
+        log.path = req.requestURI;
+        log.resourceType = segments.isEmpty() ? null : segments[0];
+        log.requestId = System.Request.getCurrent().getRequestId();
+
         try {
             negotiate(req);
-            JsonApiResponse result = new JsonApiService().handle(
-                'GET', segmentsOf(req.requestURI), req.params);
+            JsonApiResponse result = new JsonApiService().handle('GET', segments, req.params);
             writeResponse(res, result);
+            log.statusCode = result.statusCode;
+            log.rows = rowCount(result);
         } catch (JsonApiException e) {
             writeError(res, e.httpStatus, e.errors);
+            log.statusCode = e.httpStatus;
+            log.errorCode = (e.errors != null && !e.errors.isEmpty()) ? e.errors[0].code : null;
         } catch (Exception e) {
-            writeError(res, 500, internalError(e));
+            List<JsonApiError> errors = internalError(e);
+            writeError(res, 500, errors);
+            log.statusCode = 500;
+            log.errorCode = 'INTERNAL_ERROR';
+            log.errorReference = errors[0].id;
+        } finally {
+            log.durationMs = System.now().getTime() - start;
+            log.soqlQueries = Limits.getQueries() - queriesBefore;
+            JsonApiObservability.emit(log);
         }
     }
 
@@ -34,18 +55,33 @@ global with sharing class JsonApiRestResource {
 
     /**
      * Builds a 500 error that does NOT leak internals to the client. The full
-     * message + stack are logged server-side under a short reference the client
-     * can quote to support; the response carries only that reference.
+     * message + stack are logged server-side under a short reference (also set as
+     * the error `id`) the client can quote to support.
      */
     @TestVisible
     private static List<JsonApiError> internalError(Exception e) {
         String ref = EncodingUtil.convertToHex(Crypto.generateAesKey(128)).substring(0, 8);
         System.debug(LoggingLevel.ERROR,
             'JSON:API 500 [' + ref + ']: ' + e.getMessage() + '\n' + e.getStackTraceString());
-        return new List<JsonApiError>{
-            new JsonApiError(500, 'INTERNAL_ERROR', 'Internal Server Error',
-                'An unexpected error occurred. Reference: ' + ref)
-        };
+        JsonApiError err = new JsonApiError(500, 'INTERNAL_ERROR', 'Internal Server Error',
+            'An unexpected error occurred. Reference: ' + ref);
+        err.id = ref;
+        return new List<JsonApiError>{ err };
+    }
+
+    /** Count of primary `data` records, for telemetry. */
+    private static Integer rowCount(JsonApiResponse result) {
+        if (result == null || result.document == null || result.document.data == null) {
+            return 0;
+        }
+        Object data = result.document.data;
+        if (data instanceof List<JsonApiResourceObject>) {
+            return ((List<JsonApiResourceObject>) data).size();
+        }
+        if (data instanceof List<JsonApiResourceIdentifier>) {
+            return ((List<JsonApiResourceIdentifier>) data).size();
+        }
+        return 1;
     }
 
     /**

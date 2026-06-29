@@ -187,18 +187,27 @@ an endpoint without deleting the record.
 | Orchestration    | `JsonApiService`, `JsonApiResponse`                                    |
 | Configuration    | `JsonApiResourceConfig`, `JsonApiRelationshipDef`, `JsonApiRegistry`, `JsonApiBootstrap` |
 | Request parsing  | `JsonApiRequestParser`, `JsonApiQueryOptions`                         |
-| Data access      | `JsonApiQueryBuilder`, `JsonApiIncludeResolver`                       |
+| Data access      | `JsonApiQueryBuilder`, `JsonApiIncludeResolver`, `JsonApiQueryGateway`, `JsonApiUserModeGateway` |
 | Serialization    | `JsonApiSerializer`                                                    |
 | Document model   | `JsonApiDocument`, `JsonApiResourceObject`, `JsonApiResourceIdentifier`, `JsonApiRelationship`, `JsonApiError`, `JsonApiErrorSource` |
 | Errors           | `JsonApiException`                                                     |
+| Observability    | `JsonApiObservability`, `JsonApiObserver`, `JsonApiRequestLog`, `JsonApiDebugObserver` |
 | Constants        | `JsonApiConstants`                                                     |
-| Tests            | `JsonApiServiceTest`, `JsonApiRequestParserTest`, `JsonApiRestResourceTest`, `JsonApiCoverageTest` |
+| Tests            | `JsonApiServiceTest`, `JsonApiRequestParserTest`, `JsonApiRestResourceTest`, `JsonApiCoverageTest`, `JsonApiUnitTest` |
 
 ### Security
-- All SOQL/DML use `USER_MODE`, enforcing CRUD/FLS automatically.
+- All SOQL uses `USER_MODE` (via `JsonApiUserModeGateway`), enforcing CRUD/FLS automatically.
 - Object and field names in generated SOQL come only from configs, never from
   user input; all filter values are passed as bind variables — no SOQL injection.
 - Only fields declared in a config's attribute groups are ever queried or returned.
+- `500` responses never leak internals — the message/stack are logged server-side
+  under a reference id that's returned to the client.
+
+### Observability
+Every request emits a `JsonApiRequestLog` (status, duration, SOQL count, rows,
+error code/reference) to a pluggable `JsonApiObserver`. The default writes a
+structured debug line; route it elsewhere (Platform Event, custom object, …) with
+`JsonApiObservability.setObserver(myObserver)`.
 
 ### Known limitations / extension points
 - **Read-only:** only `GET` is implemented. `POST`/`PATCH`/`DELETE` return `405`.

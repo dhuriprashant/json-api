@@ -13,6 +13,53 @@ private class JsonApiUnitTest {
             String.valueOf(n).leftPad(12).replace(' ', '0'));
     }
 
+    private class RecordingObserver implements JsonApiObserver {
+        public JsonApiRequestLog last;
+        public void observe(JsonApiRequestLog log) {
+            last = log;
+        }
+    }
+
+    private class ThrowingObserver implements JsonApiObserver {
+        public void observe(JsonApiRequestLog log) {
+            throw new ObserverException('boom');
+        }
+    }
+
+    private class ObserverException extends Exception {}
+
+    @IsTest
+    static void observabilityEmitsToObserverAndSwallowsFailures() {
+        RecordingObserver rec = new RecordingObserver();
+        JsonApiObservability.setObserver(rec);
+
+        JsonApiRequestLog log = new JsonApiRequestLog();
+        log.method = 'GET';
+        log.statusCode = 200;
+        log.resourceType = 'accounts';
+        JsonApiObservability.emit(log);
+
+        System.assertEquals(200, rec.last.statusCode);
+        System.assertEquals('accounts', rec.last.resourceType);
+
+        // A misbehaving observer must never propagate out of emit().
+        JsonApiObservability.setObserver(new ThrowingObserver());
+        JsonApiObservability.emit(log);
+    }
+
+    @IsTest
+    static void debugObserverHandlesSuccessAndError() {
+        JsonApiRequestLog ok = new JsonApiRequestLog();
+        ok.statusCode = 200;
+        JsonApiRequestLog bad = new JsonApiRequestLog();
+        bad.statusCode = 500;
+
+        new JsonApiDebugObserver().observe(ok);   // INFO branch
+        new JsonApiDebugObserver().observe(bad);  // ERROR branch
+        System.assertEquals(false, ok.isError());
+        System.assertEquals(true, bad.isError());
+    }
+
     @IsTest
     static void serializesSingleResourceWithoutDml() {
         Id accId = fakeId(Account.SObjectType, 1);

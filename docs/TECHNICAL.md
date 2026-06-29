@@ -74,6 +74,7 @@ reference, see [`JSON-API-README.md`](../force-app/main/default/classes/JSON-API
 | Serialization | `JsonApiSerializer` | SObject → `JsonApiResourceObject` (attributes, to-one linkage, links). |
 | Model | `JsonApiDocument`, `JsonApiResourceObject`, `JsonApiResourceIdentifier`, `JsonApiRelationship`, `JsonApiError`, `JsonApiErrorSource` | The JSON:API document object model. |
 | Errors | `JsonApiException` | Carries HTTP status + `errors[]`; factory methods per status. |
+| Observability | `JsonApiObservability` / `JsonApiObserver` / `JsonApiRequestLog` / `JsonApiDebugObserver` | Per-request telemetry emitted at the HTTP boundary to a pluggable observer (default: structured debug log). |
 | Constants | `JsonApiConstants` | Media type, base path, param names, pagination limits. |
 
 ---
@@ -96,6 +97,7 @@ Tracing `GET /services/apexrest/jsonapi/accounts/001.../?include=parent&fields[a
 9. **Assemble** — `JsonApiDocument.ofData(resource)` (stamped with `jsonapi.version`), `included` attached.
 10. **Write response** — `writeResponse()` sets the status code, `Content-Type: application/vnd.api+json`, any extra headers, and the serialized body.
 11. **Errors** — any `JsonApiException` thrown anywhere in 2–10 is caught in `doGet()` and rendered as a JSON:API error document with the carried HTTP status; any other exception becomes a `500` error document.
+12. **Telemetry** — in a `finally`, `doGet()` emits a `JsonApiRequestLog` (status, duration, SOQL count, rows, error code/reference) to the active `JsonApiObserver`.
 
 ### Sequence diagram
 
@@ -429,6 +431,7 @@ Defaults/limits live in `JsonApiConstants` (`DEFAULT_PAGE_SIZE=25`,
 | Per-resource toggles / extra config | Add fields to `JsonApiResource__mdt` and read them in `JsonApiBootstrap`. |
 | Custom auth / rate limiting | Add checks in `JsonApiRestResource.doGet()` before delegating. |
 | Swap the data source (e.g. mock, cache, cross-org) | Implement `JsonApiQueryGateway` and inject it into `JsonApiService`. |
+| Route request telemetry (Platform Events, logging fwk) | Implement `JsonApiObserver` and register it via `JsonApiObservability.setObserver()`. |
 | To-many linkage inlined in primary `data` | Populate `relationships[name].data` during serialization by querying children. |
 
 ---
@@ -483,4 +486,36 @@ and verified live over HTTP against a real org.
   `Sort`; the update method is `updateRecord`, not `update`).
 - No `return`/`throw` placed after an exhaustive `switch` (Apex flags it as
   unreachable).
+
+---
+
+## 16. Observability
+
+Every request emits one `JsonApiRequestLog` at the HTTP boundary, captured in a
+`finally` so it fires on success **and** failure:
+
+| Field | Meaning |
+|-------|---------|
+| `requestId` | `System.Request.getCurrent().getRequestId()` — correlate with platform debug logs |
+| `method` / `path` / `resourceType` | the verb, URI, and first path segment |
+| `statusCode` | HTTP status returned |
+| `durationMs` | wall-clock latency |
+| `soqlQueries` | SOQL consumed (`Limits.getQueries()` delta) |
+| `rows` | primary `data` count |
+| `errorCode` / `errorReference` | app error code and the 500 reference id, on failure |
+
+`JsonApiObservability.emit()` hands the log to the registered `JsonApiObserver`
+and **never throws** — a broken observer can't break the response. The default
+`JsonApiDebugObserver` writes one structured JSON line per request (ERROR level
+for failures, INFO otherwise), e.g.:
+
+```
+JSONAPI {"requestId":"4ab..","method":"GET","resourceType":"accounts","path":"/services/apexrest/jsonapi/accounts","statusCode":200,"durationMs":42,"soqlQueries":2,"rows":9}
+```
+
+To ship telemetry somewhere durable (Platform Event, custom object, external
+service), implement `JsonApiObserver` and register it once:
+
+```apex
+JsonApiObservability.setObserver(new MyPlatformEventObserver());
 ```

@@ -52,6 +52,44 @@ private class JsonApiRestResourceTest {
         System.assertEquals(406, RestContext.response.statusCode);
     }
 
+    private class CapturingObserver implements JsonApiObserver {
+        public JsonApiRequestLog last;
+        public void observe(JsonApiRequestLog log) {
+            last = log;
+        }
+    }
+
+    @IsTest
+    static void observabilityCapturesSuccessfulRequest() {
+        CapturingObserver obs = new CapturingObserver();
+        JsonApiObservability.setObserver(obs);
+        newRequest('GET', '/services/apexrest/jsonapi/accounts');
+
+        JsonApiRestResource.doGet();
+
+        System.assertEquals(200, RestContext.response.statusCode);
+        System.assertNotEquals(null, obs.last, 'observer received a log');
+        System.assertEquals(200, obs.last.statusCode);
+        System.assertEquals('accounts', obs.last.resourceType);
+        System.assertEquals('GET', obs.last.method);
+        System.assert(obs.last.rows >= 1, 'rows recorded');
+        System.assert(obs.last.soqlQueries >= 1, 'soql recorded');
+        System.assert(obs.last.durationMs >= 0, 'duration recorded');
+    }
+
+    @IsTest
+    static void observabilityCapturesError() {
+        CapturingObserver obs = new CapturingObserver();
+        JsonApiObservability.setObserver(obs);
+        newRequest('GET', '/services/apexrest/jsonapi/widgets');
+
+        JsonApiRestResource.doGet();
+
+        System.assertEquals(404, RestContext.response.statusCode);
+        System.assertEquals(404, obs.last.statusCode);
+        System.assertEquals('NOT_FOUND', obs.last.errorCode);
+    }
+
     private class FakeException extends Exception {}
 
     @IsTest
