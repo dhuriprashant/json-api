@@ -17,6 +17,13 @@ public abstract class JsonApiResourceConfig {
     /** The always-returned attribute group. */
     public static final String BASE_GROUP = 'base';
 
+    // Memoized results — populated on first use, reused for the life of the instance.
+    private Map<String, Map<String, String>> memoGroups;
+    private Map<String, String> memoAttrMap;
+    private Map<String, String> memoFieldToAttr;
+    private Set<String> memoAttrFields;
+    private Map<String, JsonApiRelationshipDef> memoRels;
+
     /** The JSON:API `type` for this resource, e.g. "accounts". */
     public abstract String getType();
 
@@ -47,16 +54,30 @@ public abstract class JsonApiResourceConfig {
 
     /** The flattened union of every group: attribute name -> field API name. */
     public Map<String, String> getAttributeMap() {
-        Map<String, String> all = new Map<String, String>();
-        for (Map<String, String> grp : getAttributeGroups().values()) {
-            all.putAll(grp);
+        if (memoAttrMap == null) {
+            memoAttrMap = new Map<String, String>();
+            for (Map<String, String> grp : cachedGroups().values()) {
+                memoAttrMap.putAll(grp);
+            }
         }
-        return all;
+        return memoAttrMap;
+    }
+
+    /**
+     * Memoized accessor for relationship definitions. All framework code calls
+     * this rather than {@link #getRelationships()} directly so the map is built
+     * at most once per config instance per transaction.
+     */
+    public Map<String, JsonApiRelationshipDef> relationships() {
+        if (memoRels == null) {
+            memoRels = getRelationships();
+        }
+        return memoRels;
     }
 
     /** Whether a named attribute group exists on this resource. */
     public Boolean hasGroup(String groupName) {
-        return getAttributeGroups().containsKey(groupName);
+        return cachedGroups().containsKey(groupName);
     }
 
     /**
@@ -66,7 +87,7 @@ public abstract class JsonApiResourceConfig {
      * resource), so this is safe to apply to related resources of other types.
      */
     public Set<String> attributesForGroups(Set<String> extendGroups) {
-        Map<String, Map<String, String>> groups = getAttributeGroups();
+        Map<String, Map<String, String>> groups = cachedGroups();
         Set<String> names = new Set<String>();
         if (groups.containsKey(BASE_GROUP)) {
             names.addAll(groups.get(BASE_GROUP).keySet());
@@ -101,16 +122,22 @@ public abstract class JsonApiResourceConfig {
 
     /** Reverse of getAttributeMap: SObject field API name -> attribute name. */
     public Map<String, String> getFieldToAttributeMap() {
-        Map<String, String> reverse = new Map<String, String>();
-        for (String attr : getAttributeMap().keySet()) {
-            reverse.put(getAttributeMap().get(attr).toLowerCase(), attr);
+        if (memoFieldToAttr == null) {
+            memoFieldToAttr = new Map<String, String>();
+            Map<String, String> attrMap = getAttributeMap();
+            for (String attr : attrMap.keySet()) {
+                memoFieldToAttr.put(attrMap.get(attr).toLowerCase(), attr);
+            }
         }
-        return reverse;
+        return memoFieldToAttr;
     }
 
     /** All SObject field API names backing this resource's attributes. */
     public Set<String> getAttributeFieldNames() {
-        return new Set<String>(getAttributeMap().values());
+        if (memoAttrFields == null) {
+            memoAttrFields = new Set<String>(getAttributeMap().values());
+        }
+        return memoAttrFields;
     }
 
     public Boolean hasAttribute(String attributeName) {
@@ -122,6 +149,14 @@ public abstract class JsonApiResourceConfig {
     }
 
     public JsonApiRelationshipDef relationshipFor(String name) {
-        return getRelationships().get(name);
+        return relationships().get(name);
+    }
+
+    /** Memoizes the result of {@link #getAttributeGroups()} — called at most once. */
+    private Map<String, Map<String, String>> cachedGroups() {
+        if (memoGroups == null) {
+            memoGroups = getAttributeGroups();
+        }
+        return memoGroups;
     }
 }

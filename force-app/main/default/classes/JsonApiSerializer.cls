@@ -42,7 +42,7 @@ public with sharing class JsonApiSerializer {
         Set<String> sparse = options != null && options.hasSparseFieldsFor(type)
             ? options.sparseFieldsFor(type)
             : null;
-        for (JsonApiRelationshipDef def : config.getRelationships().values()) {
+        for (JsonApiRelationshipDef def : config.relationships().values()) {
             if (sparse != null && !sparse.contains(def.name)) {
                 continue;
             }

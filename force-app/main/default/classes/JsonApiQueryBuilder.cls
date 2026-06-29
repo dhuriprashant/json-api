@@ -76,7 +76,7 @@ public with sharing class JsonApiQueryBuilder {
         }
 
         // Always select to-one lookup fields so we can emit relationship linkage.
-        for (JsonApiRelationshipDef def : config.getRelationships().values()) {
+        for (JsonApiRelationshipDef def : config.relationships().values()) {
             if (!def.isToMany && def.lookupField != null) {
                 fields.add(def.lookupField);
             }

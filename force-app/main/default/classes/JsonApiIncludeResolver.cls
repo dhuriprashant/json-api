@@ -124,7 +124,7 @@ public with sharing class JsonApiIncludeResolver {
         for (String attr : config.resolveAttributeNames(options)) {
             fields.add(config.fieldFor(attr));
         }
-        for (JsonApiRelationshipDef def : config.getRelationships().values()) {
+        for (JsonApiRelationshipDef def : config.relationships().values()) {
             if (!def.isToMany && def.lookupField != null) {
                 fields.add(def.lookupField);
             }
