@@ -38,6 +38,7 @@ Everything is served under `/services/apexrest/jsonapi`.
 | `GET`    | `/{type}/{id}`                             | Fetch one resource           |
 | `GET`    | `/{type}/{id}/{relationship}`              | Fetch related resource(s)    |
 | `GET`    | `/{type}/{id}/relationships/{relationship}`| Fetch relationship linkage   |
+| `GET`    | `/_health`                                 | Framework diagnostics (see below) |
 
 `POST`, `PATCH` and `DELETE` are not supported (read-only framework) and return
 `405 Method Not Allowed`.
@@ -100,6 +101,33 @@ GET /services/apexrest/jsonapi/accounts/001.../?include=parent
   "errors": [ { "status": "404", "code": "NOT_FOUND", "title": "Resource Not Found",
                 "detail": "No accounts with id \"001...\"." } ] }
 ```
+
+---
+
+## Health endpoint
+
+`GET /_health` reports which resources loaded and any `JsonApiResource__mdt`
+records that failed to register (see *fault-isolated registration* above). It
+returns a meta-only document — `200` when every active record loaded, `503` when
+one or more were skipped (the healthy resources still serve):
+
+```
+GET /services/apexrest/jsonapi/_health
+```
+```json
+{
+  "jsonapi": { "version": "1.1" },
+  "meta": {
+    "status": "ok",
+    "resourceCount": 2,
+    "resources": ["accounts", "contacts"],
+    "registrationErrors": {}
+  }
+}
+```
+
+When a record is misconfigured, `status` is `"degraded"`, the HTTP status is `503`,
+and `registrationErrors` maps each bad record's `DeveloperName` to the reason.
 
 ---
 

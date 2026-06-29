@@ -44,8 +44,34 @@ public with sharing class JsonApiService {
             throw JsonApiException.methodNotAllowed('This API is read-only; only GET is supported.');
         }
 
+        // Diagnostics endpoint — not a resource type, so it must be matched
+        // before the registry lookup (which would 404 on "_health").
+        if (segments[0] == JsonApiConstants.HEALTH_PATH) {
+            return health();
+        }
+
         JsonApiResourceConfig config = JsonApiRegistry.forType(segments[0]);
         return handleGet(config, segments, params);
+    }
+
+    /**
+     * Reports framework health: the resources that loaded and any CMDT records
+     * that failed to register. Returns 200 when all configured resources loaded,
+     * or 503 when one or more were skipped (the healthy ones still serve).
+     * @see https://jsonapi.org/format/#document-meta
+     */
+    private JsonApiResponse health() {
+        List<String> types = JsonApiRegistry.registeredTypes();
+        Map<String, String> errors = JsonApiBootstrap.getRegistrationErrors();
+        Boolean ok = errors.isEmpty();
+
+        Map<String, Object> meta = new Map<String, Object>{
+            'status' => ok ? 'ok' : 'degraded',
+            'resourceCount' => types.size(),
+            'resources' => types,
+            'registrationErrors' => errors
+        };
+        return new JsonApiResponse(ok ? 200 : 503, JsonApiDocument.ofMeta(meta));
     }
 
     // ---------------------------------------------------------------------

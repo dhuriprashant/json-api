@@ -17,12 +17,25 @@ public class JsonApiDocument {
     public Map<String, Object> links;
     public Map<String, Object> jsonapi;
 
+    /** Whether this is a data document — controls whether `data` is emitted (as
+     *  null, if so). A meta-only document leaves it false so `data` is absent. */
+    private Boolean isDataDocument = false;
+
     public JsonApiDocument() {}
 
     /** Wraps primary data and stamps the document with the spec version. */
     public static JsonApiDocument ofData(Object data) {
         JsonApiDocument doc = new JsonApiDocument();
         doc.data = data;
+        doc.isDataDocument = true;
+        doc.jsonapi = new Map<String, Object>{ 'version' => JsonApiConstants.VERSION };
+        return doc;
+    }
+
+    /** Wraps a top-level `meta` object (no primary data), e.g. for diagnostics. */
+    public static JsonApiDocument ofMeta(Map<String, Object> meta) {
+        JsonApiDocument doc = new JsonApiDocument();
+        doc.meta = meta;
         doc.jsonapi = new Map<String, Object>{ 'version' => JsonApiConstants.VERSION };
         return doc;
     }
@@ -57,7 +70,7 @@ public class JsonApiDocument {
         }
         if (errors != null) {
             out.put('errors', errors);
-        } else {
+        } else if (isDataDocument) {
             out.put('data', data); // always present for a data document; null preserved
         }
         if (included != null) {

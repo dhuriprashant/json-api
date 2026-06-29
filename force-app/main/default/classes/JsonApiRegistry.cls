@@ -48,6 +48,15 @@ public with sharing class JsonApiRegistry {
         return byType.containsKey(type == null ? null : type.toLowerCase());
     }
 
+    /** Sorted JSON:API type names of every successfully registered resource.
+     *  Forces initialization, so callers also see any registration errors. */
+    public static List<String> registeredTypes() {
+        ensureInitialized();
+        List<String> types = new List<String>(byType.keySet());
+        types.sort();
+        return types;
+    }
+
     /** Test hook: clears the registry and forces re-initialization. */
     @TestVisible
     private static void reset() {

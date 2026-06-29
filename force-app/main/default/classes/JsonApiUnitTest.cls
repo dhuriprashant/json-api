@@ -61,6 +61,40 @@ private class JsonApiUnitTest {
     }
 
     @IsTest
+    static void healthEndpointReportsOkWhenAllResourcesLoad() {
+        JsonApiRegistry.reset(); // load from the real (valid) CMDT records
+
+        JsonApiResponse r = new JsonApiService(new JsonApiTestQueryGateway()).handle(
+            'GET', new List<String>{ JsonApiConstants.HEALTH_PATH }, new Map<String, String>());
+
+        System.assertEquals(200, r.statusCode);
+        System.assertEquals('ok', r.document.meta.get('status'));
+        System.assertEquals(0, ((Map<String, String>) r.document.meta.get('registrationErrors')).size());
+        System.assert(((List<String>) r.document.meta.get('resources')).contains('accounts'));
+        // Meta-only document: no primary data member, not even an explicit null.
+        System.assert(!r.document.toJson().contains('"data"'), r.document.toJson());
+    }
+
+    @IsTest
+    static void healthEndpointReportsDegradedWithRegistrationErrors() {
+        JsonApiBootstrap.configOverride = new List<JsonApiResource__mdt>{
+            new JsonApiResource__mdt(DeveloperName = 'Accounts', Apex_Class__c = 'AccountResourceConfig', Is_Active__c = true),
+            new JsonApiResource__mdt(DeveloperName = 'Bad', Apex_Class__c = 'NoSuchClass__X', Is_Active__c = true)
+        };
+        JsonApiRegistry.reset();
+
+        JsonApiResponse r = new JsonApiService(new JsonApiTestQueryGateway()).handle(
+            'GET', new List<String>{ JsonApiConstants.HEALTH_PATH }, new Map<String, String>());
+
+        System.assertEquals(503, r.statusCode);
+        System.assertEquals('degraded', r.document.meta.get('status'));
+        Map<String, String> errors = (Map<String, String>) r.document.meta.get('registrationErrors');
+        System.assert(errors.containsKey('Bad'), 'bad record surfaced in health: ' + errors);
+        // The healthy resource is still listed.
+        System.assert(((List<String>) r.document.meta.get('resources')).contains('accounts'));
+    }
+
+    @IsTest
     static void errorSourceFactoriesSetTheRightMember() {
         JsonApiErrorSource byPointer = JsonApiErrorSource.forPointer('/data/id');
         System.assertEquals('/data/id', byPointer.pointer);

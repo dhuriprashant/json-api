@@ -22,6 +22,9 @@ public with sharing class JsonApiConstants {
     /** Comma-separated list of extra attribute groups to include in the payload. */
     public static final String PARAM_EXTEND = 'extend';
 
+    /** Reserved path segment for the diagnostics/health endpoint (not a resource type). */
+    public static final String HEALTH_PATH = '_health';
+
     // ---- Pagination sub-keys ----
     public static final String PAGE_LIMIT = 'limit';
     public static final String PAGE_OFFSET = 'offset';
