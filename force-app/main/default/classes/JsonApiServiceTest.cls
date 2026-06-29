@@ -125,6 +125,47 @@ private class JsonApiServiceTest {
     }
 
     @IsTest
+    static void filtersWithComparisonOperators() {
+        // Only Acme has a revenue (1,000,000); Parent Co and Globex are null,
+        // and null never satisfies a comparison in SOQL.
+        System.assertEquals(1, count(handle('GET', new List<String>{ 'accounts' },
+            new Map<String, String>{ 'filter[annualRevenue][gt]' => '500000' }, null)));
+
+        // A gte/lt range on the same attribute - two conditions, AND-ed.
+        System.assertEquals(1, count(handle('GET', new List<String>{ 'accounts' },
+            new Map<String, String>{
+                'filter[annualRevenue][gte]' => '1000000',
+                'filter[annualRevenue][lt]' => '2000000' }, null)));
+
+        // lte just below Acme's revenue excludes it.
+        System.assertEquals(0, count(handle('GET', new List<String>{ 'accounts' },
+            new Map<String, String>{ 'filter[annualRevenue][lte]' => '999999' }, null)));
+    }
+
+    @IsTest
+    static void filtersWithNeLikeInNin() {
+        // ne: Technology excluded -> Globex (Manufacturing) only.
+        System.assertEquals(1, count(handle('GET', new List<String>{ 'accounts' },
+            new Map<String, String>{ 'filter[industry][ne]' => 'Technology' }, null)));
+
+        // like: name begins with "Acme".
+        System.assertEquals(1, count(handle('GET', new List<String>{ 'accounts' },
+            new Map<String, String>{ 'filter[name][like]' => 'Acme%' }, null)));
+
+        // in: both industries -> all three accounts.
+        System.assertEquals(3, count(handle('GET', new List<String>{ 'accounts' },
+            new Map<String, String>{ 'filter[industry][in]' => 'Technology,Manufacturing' }, null)));
+
+        // nin: exclude Manufacturing -> the two Technology accounts.
+        System.assertEquals(2, count(handle('GET', new List<String>{ 'accounts' },
+            new Map<String, String>{ 'filter[industry][nin]' => 'Manufacturing' }, null)));
+    }
+
+    private static Integer count(JsonApiResponse r) {
+        return ((List<JsonApiResourceObject>) r.document.data).size();
+    }
+
+    @IsTest
     static void getsRelatedToManyCollection() {
         Id id = acme().Id;
         JsonApiResponse r = handle('GET', new List<String>{ 'accounts', id, 'contacts' },

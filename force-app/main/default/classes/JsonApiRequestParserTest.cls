@@ -36,7 +36,43 @@ private class JsonApiRequestParserTest {
 
         System.assertEquals(10, opts.pageSize);
         System.assertEquals(3, opts.pageNumber);
-        System.assertEquals('Technology', opts.filters.get('industry'));
+        System.assertEquals(1, opts.filters.size());
+        JsonApiQueryOptions.FilterCondition fc = opts.filters[0];
+        System.assertEquals('industry', fc.attribute);
+        System.assertEquals('eq', fc.operator, 'bare filter defaults to eq');
+        System.assertEquals('Technology', fc.rawValue);
+    }
+
+    @IsTest
+    static void parsesFilterOperators() {
+        Map<String, String> params = new Map<String, String>{
+            'filter[annualRevenue][gte]' => '1000000',
+            'filter[annualRevenue][lt]' => '5000000',
+            'filter[industry][in]' => 'Technology,Finance',
+            'filter[name][like]' => 'Acme%'
+        };
+
+        JsonApiQueryOptions opts = JsonApiRequestParser.parse(params, config());
+
+        System.assertEquals(4, opts.filters.size(), 'four conditions, incl. a gte/lt range');
+        Map<String, String> opByAttr = new Map<String, String>();
+        for (JsonApiQueryOptions.FilterCondition fc : opts.filters) {
+            opByAttr.put(fc.attribute + ':' + fc.operator, fc.rawValue);
+        }
+        System.assertEquals('1000000', opByAttr.get('annualRevenue:gte'));
+        System.assertEquals('5000000', opByAttr.get('annualRevenue:lt'));
+        System.assertEquals('Technology,Finance', opByAttr.get('industry:in'));
+        System.assertEquals('Acme%', opByAttr.get('name:like'));
+    }
+
+    @IsTest
+    static void rejectsUnsupportedFilterOperator() {
+        assertBadRequest(new Map<String, String>{ 'filter[industry][bogusop]' => 'x' });
+    }
+
+    @IsTest
+    static void rejectsUnknownAttributeWithOperator() {
+        assertBadRequest(new Map<String, String>{ 'filter[bogus][gt]' => '1' });
     }
 
     @IsTest

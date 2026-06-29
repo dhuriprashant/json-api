@@ -12,6 +12,15 @@ public with sharing class JsonApiRequestParser {
     private static final System.Pattern BRACKET_PATTERN =
         System.Pattern.compile('^(\\w+)\\[([^\\]]+)\\]$');
 
+    /** Matches filter[attr] and filter[attr][operator]; group 2 (operator) is optional. */
+    private static final System.Pattern FILTER_PATTERN =
+        System.Pattern.compile('(?i)^filter\\[([^\\]]+)\\](?:\\[([^\\]]+)\\])?$');
+
+    /** Comparison operators accepted in filter[attr][op]. `eq` is the default. */
+    private static final Set<String> FILTER_OPERATORS = new Set<String>{
+        'eq', 'ne', 'gt', 'gte', 'lt', 'lte', 'like', 'in', 'nin'
+    };
+
     /**
      * @param params  the raw query parameters (RestRequest.params)
      * @param config  the config of the primary resource being fetched
@@ -24,8 +33,16 @@ public with sharing class JsonApiRequestParser {
 
         for (String rawKey : params.keySet()) {
             String value = params.get(rawKey);
-            System.Matcher m = BRACKET_PATTERN.matcher(rawKey);
 
+            // filter[attr] / filter[attr][op] is matched first because its
+            // double-bracket form is not covered by the generic family pattern.
+            System.Matcher fm = FILTER_PATTERN.matcher(rawKey);
+            if (fm.matches()) {
+                parseFilter(opts, config, fm.group(1), fm.group(2), value);
+                continue;
+            }
+
+            System.Matcher m = BRACKET_PATTERN.matcher(rawKey);
             if (m.matches()) {
                 String family = m.group(1).toLowerCase();
                 String key = m.group(2);
@@ -33,8 +50,6 @@ public with sharing class JsonApiRequestParser {
                     parseSparseFields(opts, key, value);
                 } else if (family == JsonApiConstants.PARAM_PAGE) {
                     parsePage(opts, key, value);
-                } else if (family == JsonApiConstants.PARAM_FILTER) {
-                    parseFilter(opts, config, key, value);
                 }
             } else {
                 String key = rawKey.toLowerCase();
@@ -141,13 +156,26 @@ public with sharing class JsonApiRequestParser {
         }
     }
 
-    private static void parseFilter(JsonApiQueryOptions opts, JsonApiResourceConfig config, String attr, String value) {
+    private static void parseFilter(
+        JsonApiQueryOptions opts,
+        JsonApiResourceConfig config,
+        String attr,
+        String op,
+        String value
+    ) {
         if (!config.hasAttribute(attr)) {
             throw JsonApiException.badRequest(
                 'Cannot filter by unknown attribute "' + attr + '".',
                 JsonApiErrorSource.forParameter('filter[' + attr + ']'));
         }
-        opts.filters.put(attr, value);
+        String operator = String.isBlank(op) ? 'eq' : op.toLowerCase();
+        if (!FILTER_OPERATORS.contains(operator)) {
+            throw JsonApiException.badRequest(
+                'Unsupported filter operator "' + op + '" on "' + attr +
+                '". Supported: ' + String.join(new List<String>(FILTER_OPERATORS), ', ') + '.',
+                JsonApiErrorSource.forParameter('filter[' + attr + '][' + op + ']'));
+        }
+        opts.filters.add(new JsonApiQueryOptions.FilterCondition(attr, operator, value));
     }
 
     private static void parsePage(JsonApiQueryOptions opts, String key, String value) {

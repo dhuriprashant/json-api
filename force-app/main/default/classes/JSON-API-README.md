@@ -51,6 +51,7 @@ Everything is served under `/services/apexrest/jsonapi`.
 | `fields[TYPE]`       | `?fields[accounts]=name,phone`       | Sparse fieldsets, per type (takes precedence over `extend`) |
 | `sort`               | `?sort=-annualRevenue,name`          | `-` prefix = descending                 |
 | `filter[ATTR]`       | `?filter[industry]=Technology`       | Equality; multiple filters are AND-ed   |
+| `filter[ATTR][OP]`   | `?filter[annualRevenue][gte]=1000000`| Operators: `eq` `ne` `gt` `gte` `lt` `lte` `like` `in` `nin`. `in`/`nin` take a comma-separated list; a bare `filter[ATTR]` means `eq` |
 | `page[size]`,`page[number]` | `?page[size]=10&page[number]=2`| Page-based pagination                    |
 | `page[limit]`,`page[offset]`| `?page[limit]=10&page[offset]=20`| Offset-based pagination                 |
 
@@ -218,8 +219,9 @@ structured debug line; route it elsewhere (Platform Event, custom object, …) w
 - `include` populates the top-level `included` array and to-one linkage; to-many
   linkage inside primary `data` is exposed via the relationship endpoints rather
   than inlined.
-- Filtering supports equality only. Extend `JsonApiQueryBuilder.computeWhere()`
-  for operators (ranges, `LIKE`, `IN`).
+- Filtering supports `eq`, `ne`, `gt`, `gte`, `lt`, `lte`, `like`, `in` and `nin`
+  via `filter[attr][op]`; conditions are AND-ed and field values are always bound,
+  never interpolated. Add more operators in `JsonApiQueryBuilder.buildClause()`.
 - Bulk/atomic operations and writing to relationship endpoints are not yet
   implemented.
 

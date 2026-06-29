@@ -96,13 +96,115 @@ public with sharing class JsonApiQueryBuilder {
             return null;
         }
         List<String> clauses = new List<String>();
-        for (String attr : options.filters.keySet()) {
-            String fieldName = config.fieldFor(attr);
-            String bindName = 'f' + (bindCounter++);
-            binds.put(bindName, coerce(fieldName, options.filters.get(attr)));
-            clauses.add(fieldName + ' = :' + bindName);
+        for (JsonApiQueryOptions.FilterCondition fc : options.filters) {
+            clauses.add(buildClause(fc));
         }
         return String.join(clauses, ' AND ');
+    }
+
+    /**
+     * Renders one filter condition into a SOQL fragment, binding its value(s).
+     * The field name comes from the config (never user input); every value is a
+     * bind variable, so the result is injection-safe.
+     */
+    private String buildClause(JsonApiQueryOptions.FilterCondition fc) {
+        String fieldName = config.fieldFor(fc.attribute);
+        String bindName = 'f' + (bindCounter++);
+        switch on fc.operator {
+            when 'ne' {
+                binds.put(bindName, coerce(fieldName, fc.rawValue));
+                return fieldName + ' != :' + bindName;
+            }
+            when 'gt' {
+                binds.put(bindName, coerce(fieldName, fc.rawValue));
+                return fieldName + ' > :' + bindName;
+            }
+            when 'gte' {
+                binds.put(bindName, coerce(fieldName, fc.rawValue));
+                return fieldName + ' >= :' + bindName;
+            }
+            when 'lt' {
+                binds.put(bindName, coerce(fieldName, fc.rawValue));
+                return fieldName + ' < :' + bindName;
+            }
+            when 'lte' {
+                binds.put(bindName, coerce(fieldName, fc.rawValue));
+                return fieldName + ' <= :' + bindName;
+            }
+            when 'like' {
+                // Bound as a string; wildcards (% _) come from the client.
+                binds.put(bindName, fc.rawValue);
+                return fieldName + ' LIKE :' + bindName;
+            }
+            when 'in' {
+                binds.put(bindName, coerceList(fieldName, fc.rawValue));
+                return fieldName + ' IN :' + bindName;
+            }
+            when 'nin' {
+                binds.put(bindName, coerceList(fieldName, fc.rawValue));
+                return fieldName + ' NOT IN :' + bindName;
+            }
+            when else {
+                // 'eq' and any unrecognized operator (the parser already rejects
+                // unsupported ones) fall back to equality.
+                binds.put(bindName, coerce(fieldName, fc.rawValue));
+                return fieldName + ' = :' + bindName;
+            }
+        }
+    }
+
+    /**
+     * Splits a comma-separated value into a *typed* list for IN / NOT IN binds.
+     * SOQL rejects a `List<Object>` (ANY) bind, so the list's element type must
+     * match the column (e.g. `List<String>` for a picklist, `List<Integer>` for a
+     * number). Values are still bound, never interpolated.
+     */
+    private Object coerceList(String fieldApiName, String csv) {
+        List<String> raw = new List<String>();
+        if (String.isNotBlank(csv)) {
+            for (String part : csv.split(',')) {
+                raw.add(part.trim());
+            }
+        }
+        Schema.SObjectField field = config.fieldMap().get(fieldApiName.toLowerCase());
+        Schema.DisplayType dt = field == null ? Schema.DisplayType.STRING : field.getDescribe().getType();
+        try {
+            switch on dt {
+                when Integer {
+                    List<Integer> out = new List<Integer>();
+                    for (String s : raw) { out.add(Integer.valueOf(s)); }
+                    return out;
+                }
+                when Double, Currency, Percent {
+                    List<Double> out = new List<Double>();
+                    for (String s : raw) { out.add(Double.valueOf(s)); }
+                    return out;
+                }
+                when Date {
+                    List<Date> out = new List<Date>();
+                    for (String s : raw) { out.add(Date.valueOf(s)); }
+                    return out;
+                }
+                when Datetime {
+                    List<Datetime> out = new List<Datetime>();
+                    for (String s : raw) { out.add(Datetime.valueOf(s)); }
+                    return out;
+                }
+                when Boolean {
+                    List<Boolean> out = new List<Boolean>();
+                    for (String s : raw) { out.add(Boolean.valueOf(s)); }
+                    return out;
+                }
+                when else {
+                    // Text, picklist, reference/Id, email, phone, … all bind as strings.
+                    return raw;
+                }
+            }
+        } catch (Exception e) {
+            throw JsonApiException.badRequest(
+                'Filter list value "' + csv + '" is not valid for this field.',
+                JsonApiErrorSource.forParameter('filter'));
+        }
     }
 
     private String buildOrderBy() {

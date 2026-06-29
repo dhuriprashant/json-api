@@ -17,6 +17,22 @@ public class JsonApiQueryOptions {
         }
     }
 
+    /**
+     * A single filter directive: an attribute, a comparison operator and the raw
+     * (uncoerced) value. The builder coerces the value to the field's type and
+     * renders the SOQL clause. The operator defaults to `eq`.
+     */
+    public class FilterCondition {
+        public String attribute;
+        public String operator;
+        public String rawValue;
+        public FilterCondition(String attribute, String operator, String rawValue) {
+            this.attribute = attribute;
+            this.operator = operator;
+            this.rawValue = rawValue;
+        }
+    }
+
     /** Relationship paths to include, e.g. ['account', 'contacts']. */
     public List<String> includePaths = new List<String>();
 
@@ -28,8 +44,9 @@ public class JsonApiQueryOptions {
 
     public List<SortField> sorts = new List<SortField>();
 
-    /** filter attribute name -> value (equality). */
-    public Map<String, String> filters = new Map<String, String>();
+    /** Filter directives, AND-ed together. Multiple conditions may target the
+     *  same attribute (e.g. a gt/lt range). */
+    public List<FilterCondition> filters = new List<FilterCondition>();
 
     public Integer pageSize = JsonApiConstants.DEFAULT_PAGE_SIZE;
     public Integer pageOffset = 0;

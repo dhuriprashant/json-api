@@ -237,7 +237,8 @@ from the *key* with the regex `^(\w+)\[([^\]]+)\]$`:
 |---------|--------|-----|---------|
 | `fields[accounts]` | `fields` | `accounts` | sparse fieldset for type `accounts` |
 | `page[size]` | `page` | `size` | pagination |
-| `filter[industry]` | `filter` | `industry` | equality filter |
+| `filter[industry]` | `filter` | `industry` | equality filter (`eq`) |
+| `filter[annualRevenue][gte]` | `filter` | `annualRevenue` / `gte` | operator filter (`eq`/`ne`/`gt`/`gte`/`lt`/`lte`/`like`/`in`/`nin`) |
 | `include` | — | — | relationship paths |
 | `sort` | — | — | sort directives |
 | `extend` | — | — | extra attribute groups |
@@ -267,9 +268,11 @@ it injection-proof:
    names = the values of `getAttributeMap()` / relationship defs. User input
    selects *which* configured field, never supplies a raw name. Sort/filter
    attribute names were already validated against the config in the parser.
-2. **Values are always bind variables.** `computeWhere()` emits `Field = :fN` and
-   stores the value in `binds`; the service executes with
-   `Database.queryWithBinds(soql, binds, AccessLevel.USER_MODE)`.
+2. **Values are always bind variables.** `buildClause()` emits the operator form
+   (`Field = :fN`, `Field > :fN`, `Field LIKE :fN`, `Field IN :fN`, …) and stores
+   the value (or coerced list for `in`/`nin`) in `binds`; the service executes with
+   `Database.queryWithBinds(soql, binds, AccessLevel.USER_MODE)`. The operator
+   itself is whitelisted by the parser, so it can never inject SOQL either.
 
 ### Field selection
 
@@ -436,7 +439,7 @@ Defaults/limits live in `JsonApiConstants` (`DEFAULT_PAGE_SIZE=25`,
 | To add… | Do this |
 |---------|---------|
 | A new resource | Subclass `JsonApiResourceConfig`; add a `JsonApiResource__mdt` record naming it. |
-| Filter operators (`>`, `<`, `LIKE`, `IN`) | Extend `JsonApiQueryBuilder.computeWhere()` (and the parser to accept the syntax). |
+| More filter operators | Add a `when` branch in `JsonApiQueryBuilder.buildClause()` and the operator name to `FILTER_OPERATORS` in the parser. |
 | Computed/virtual attributes | Override serialization for the type, or post-process the `JsonApiResourceObject`. |
 | Per-resource toggles / extra config | Add fields to `JsonApiResource__mdt` and read them in `JsonApiBootstrap`. |
 | Custom auth / rate limiting | Add checks in `JsonApiRestResource.doGet()` before delegating. |
@@ -481,7 +484,8 @@ and verified live over HTTP against a real org.
 - **to-many linkage** is exposed via relationship endpoints, not inlined into the
   primary `data` (to keep list responses lean). `included` side-loading works for
   to-many.
-- **Filtering is equality-only.** No ranges/`LIKE`/`IN` yet.
+- **Filtering** supports `eq`/`ne`/`gt`/`gte`/`lt`/`lte`/`like`/`in`/`nin` via
+  `filter[attr][op]` (bare `filter[attr]` = `eq`); conditions are AND-ed.
 - **OFFSET** is bounded by the platform at 2000 — deep pagination should move to
   keyset/`WHERE Id >` strategies for very large datasets.
 

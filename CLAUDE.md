@@ -62,6 +62,6 @@ Relationships are declared via `JsonApiRelationshipDef.toOne(name, targetType, l
 - Read-only: only `GET` is implemented. `JsonApiService.handle` rejects any non-GET verb with 405, and `JsonApiRestResource` exposes only `@HttpGet`. There is no create/update/delete path or deserializer.
 - All data access must stay in `AccessLevel.USER_MODE` to keep CRUD/FLS enforcement — preserve this in any new query/DML path.
 - Attributes are grouped via `getAttributeGroups()`; `base` is always returned, other groups only via `?extend=group1,group2`. A sparse `fields[type]` set takes precedence over `extend`. `resolveAttributeNames()` is the single source of truth used by the builder, serializer, and include resolver.
-- Filtering is equality-only; extend `JsonApiQueryBuilder.computeWhere()` to add operators.
+- Filtering supports operators via `filter[attr][op]` (`eq`/`ne`/`gt`/`gte`/`lt`/`lte`/`like`/`in`/`nin`; bare `filter[attr]` = `eq`, and `in`/`nin` take a comma-separated list). Conditions are AND-ed; `JsonApiQueryOptions.filters` is a `List<FilterCondition>` (multiple conditions may target one attribute, e.g. a gt/lt range). Add operators in `JsonApiQueryBuilder.buildClause()`. Values are always bound, never interpolated.
 - `include` inlines the `included` array and to-one linkage; to-many linkage is exposed via the relationship endpoints, not inlined in primary `data`.
 - Bulk/atomic operations and writes to relationship endpoints are not implemented.
