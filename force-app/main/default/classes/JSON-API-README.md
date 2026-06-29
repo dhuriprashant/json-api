@@ -64,7 +64,7 @@ Everything is served under `/services/apexrest/jsonapi`.
 
 ```
 GET /services/apexrest/jsonapi/accounts?filter[industry]=Technology&sort=-name&fields[accounts]=name,industry
-Accept: application/vnd.api+json
+Accept: application/json
 ```
 
 **Fetch one account and side-load its parent:**

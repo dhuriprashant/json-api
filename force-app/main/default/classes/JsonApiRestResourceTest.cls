@@ -80,9 +80,10 @@ private class JsonApiRestResourceTest {
     }
 
     @IsTest
-    static void parameterizedAcceptIsNotAcceptable() {
+    static void parameterizedJsonApiMediaTypeIsNotAcceptable() {
         RestRequest req = newRequest('GET', '/services/apexrest/jsonapi/accounts');
-        req.addHeader('Accept', JsonApiConstants.MEDIA_TYPE + ';charset=utf-8');
+        // Parameterized JSON:API media type (e.g., with charset) is still not allowed
+        req.addHeader('Accept', JsonApiConstants.MEDIA_TYPE_JSON_API + ';charset=utf-8');
 
         JsonApiRestResource.doGet();
 

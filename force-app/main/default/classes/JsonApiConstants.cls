@@ -3,8 +3,11 @@
  * @see https://jsonapi.org/format/
  */
 public with sharing class JsonApiConstants {
-    /** The official JSON:API media type, used for both Content-Type and Accept. */
-    public static final String MEDIA_TYPE = 'application/vnd.api+json';
+    /** Response media type. We use application/json (simpler) but maintain JSON:API document structure. */
+    public static final String MEDIA_TYPE = 'application/json';
+
+    /** Legacy JSON:API media type — accepted in Accept header for compatibility. */
+    public static final String MEDIA_TYPE_JSON_API = 'application/vnd.api+json';
 
     /** The version of the JSON:API spec this framework targets. */
     public static final String VERSION = '1.1';

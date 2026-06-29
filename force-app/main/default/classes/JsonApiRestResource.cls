@@ -85,15 +85,24 @@ global with sharing class JsonApiRestResource {
     }
 
     /**
-     * Enforces JSON:API content negotiation: if the Accept header names the
-     * JSON:API media type, at least one instance must be unparameterized.
+     * Enforces content negotiation: accepts application/json or the JSON:API
+     * media type (unparameterized). The response is always application/json
+     * with JSON:API document structure.
      */
     private static void negotiate(RestRequest req) {
         String accept = header(req, 'Accept');
-        if (String.isNotBlank(accept) && accept.contains(JsonApiConstants.MEDIA_TYPE)) {
+        if (String.isBlank(accept)) {
+            return;  // no Accept header = accept any type
+        }
+        // Allow application/json directly
+        if (accept.contains('application/json')) {
+            return;
+        }
+        // Allow JSON:API media type (unparameterized only)
+        if (accept.contains(JsonApiConstants.MEDIA_TYPE_JSON_API)) {
             Boolean hasUnparameterized = false;
             for (String range : accept.split(',')) {
-                if (range.trim().equalsIgnoreCase(JsonApiConstants.MEDIA_TYPE)) {
+                if (range.trim().equalsIgnoreCase(JsonApiConstants.MEDIA_TYPE_JSON_API)) {
                     hasUnparameterized = true;
                 }
             }

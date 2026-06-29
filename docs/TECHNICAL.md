@@ -84,7 +84,7 @@ reference, see [`JSON-API-README.md`](../force-app/main/default/classes/JSON-API
 Tracing `GET /services/apexrest/jsonapi/accounts/001.../?include=parent&fields[accounts]=name`:
 
 1. **Entry** — `JsonApiRestResource.doGet()` (the only HTTP handler) runs the request directly.
-2. **Content negotiation** — `negotiate()` validates `Accept`: a JSON:API media type that is parameterized in every instance → `406`.
+2. **Content negotiation** — `negotiate()` accepts `application/json` or unparameterized `application/vnd.api+json`. Response is always `application/json` with JSON:API document structure.
 3. **Path split** — `segmentsOf(requestURI)` finds the `jsonapi` base token and returns the URL-decoded segments after it: `['accounts', '001...']`.
 4. **Service dispatch** — `JsonApiService.handle('GET', segments, params)`:
    - any non-GET verb → `405`;

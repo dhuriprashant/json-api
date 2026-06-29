@@ -38,7 +38,7 @@ all enforced under the running user's CRUD/FLS via `AccessLevel.USER_MODE`.
 | Sorting               | `?sort=-annualRevenue,name`                                    |
 | Filtering             | `?filter[industry]=Technology`; operators via `?filter[annualRevenue][gte]=1000000` (`eq`/`ne`/`gt`/`gte`/`lt`/`lte`/`like`/`in`/`nin`) |
 | Pagination            | `?page[size]=10&page[number]=2` or `?page[limit]=10&page[offset]=20` |
-| Content negotiation   | `application/vnd.api+json` (415 / 406 enforcement)            |
+| Content negotiation   | `application/json` response (accepts both `application/json` and `application/vnd.api+json`) |
 | Error documents       | Spec-compliant `errors[]` with HTTP status, code, source pointer |
 | Health/diagnostics    | `GET /_health` — registered resources + any registration failures (`200`/`503`) |
 
