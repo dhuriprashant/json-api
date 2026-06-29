@@ -88,6 +88,7 @@ Tracing `GET /services/apexrest/jsonapi/accounts/001.../?include=parent&fields[a
 3. **Path split** — `segmentsOf(requestURI)` finds the `jsonapi` base token and returns the URL-decoded segments after it: `['accounts', '001...']`.
 4. **Service dispatch** — `JsonApiService.handle('GET', segments, params)`:
    - any non-GET verb → `405`;
+   - the reserved `_health` segment short-circuits to the diagnostics document (before any registry lookup);
    - `JsonApiRegistry.forType('accounts')` resolves the config (lazy-initializing the registry via `JsonApiBootstrap` on first call). Unknown type → `404`.
    - routes by path shape → `handleGet()`.
 5. **Parse query** — `JsonApiRequestParser.parse(params, config)` produces `JsonApiQueryOptions`. Unknown sort/filter/include names are rejected with `400` here, before any SOQL exists.
@@ -218,10 +219,19 @@ Registration is **data-driven via the `JsonApiResource__mdt` Custom Metadata Typ
 
 `registerAll()` queries the active records and, for each, resolves the class with
 `Type.forName(Apex_Class__c)` and `newInstance()`, validates it `instanceof
-JsonApiResourceConfig`, and registers it. Misconfiguration fails fast with a
-`500` (`JsonApiException.internal`): unknown class, no public no-arg constructor,
-or a class that doesn't extend the base. A `@TestVisible configOverride` field lets
-tests inject in-memory CMDT rows without DML.
+JsonApiResourceConfig`, and registers it. Registration is **fault-isolated**: each
+record is wrapped in its own try/catch, so a misconfigured one (unknown class, no
+public no-arg constructor, or a class that doesn't extend the base) is *skipped* —
+the reason is logged at `ERROR` and recorded in
+`JsonApiBootstrap.getRegistrationErrors()` — while the healthy records still load. A
+request for a skipped type then returns a clean `404` rather than a `500` that would
+also break every other resource. A `@TestVisible configOverride` field lets tests
+inject in-memory CMDT rows without DML.
+
+The **`GET /_health`** route (matched in `JsonApiService.handle` before the registry
+lookup, since `_health` is not a resource type) surfaces this: a meta-only document
+listing the registered resources and any `registrationErrors`, with HTTP `200` when
+all active records loaded or `503` when one or more were skipped.
 
 Because configs are loaded by name, **adding a resource needs no Apex change to the
 framework** — only a new config class plus a CMDT record.
@@ -458,16 +468,16 @@ integration tests:
 |------------|------|-------|
 | `JsonApiUnitTest` | No | Read/serialize/include pipeline driven by an in-memory `JsonApiTestQueryGateway` with fabricated SObjects — runs anywhere, even orgs with broken triggers. |
 | `JsonApiRequestParserTest` | No | Param parsing + validation rejections. |
-| `JsonApiServiceTest` | Yes | GET operations — collection, single, include, sparse, `extend`, sort/filter, pagination, related/linkage endpoints, error statuses (incl. non-GET → 405) — via `JsonApiService.handle()`. |
+| `JsonApiServiceTest` | Yes | GET operations — collection, single, include, sparse, `extend`, sort, filter operators (`gt`/`gte`/`lt`/`lte`/`ne`/`like`/`in`/`nin`), pagination, related/linkage endpoints, error statuses (incl. non-GET → 405) — via `JsonApiService.handle()`. |
 | `JsonApiRestResourceTest` | Yes | HTTP layer: `RestContext` plumbing, content negotiation (406), error rendering, `internalError` redaction, `segmentsOf`. |
-| `JsonApiCoverageTest` | Yes | Config helpers, nested/coalesced include, document-model helpers, CMDT-driven registration. |
+| `JsonApiCoverageTest` | Yes | Config helpers, nested/coalesced include, document-model helpers, fault-isolated CMDT registration. |
 
 The DB seam (`JsonApiQueryGateway`) is what makes the unit tests possible: inject
 `JsonApiTestQueryGateway` via the `@TestVisible JsonApiService(gateway)`
 constructor and seed rows per SObjectType — no inserts, no org coupling.
 
-**Status:** all tests passing with healthy org-wide coverage (clean scratch org),
-and verified live over HTTP against a real org.
+**Status:** 75 tests passing, 94% org-wide coverage with every framework class
+≥89% (clean scratch org), and verified live over HTTP against a real org.
 
 > The DML-backed tests insert real `Account`/`Contact` records, so a broken
 > Account/Contact trigger in the target org will fail them — an org problem, not a

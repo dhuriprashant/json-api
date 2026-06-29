@@ -42,6 +42,32 @@
   ],
   "item": [
     {
+      "name": "Diagnostics",
+      "item": [
+        {
+          "name": "Health (200 ok / 503 degraded)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "{{mediaType}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/_health",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "_health"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
       "name": "Accounts - Reads",
       "item": [
         {
@@ -163,6 +189,118 @@
                 {
                   "key": "filter[industry]",
                   "value": "Technology"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Filter (operator: gte)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "{{mediaType}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/accounts?filter[annualRevenue][gte]=1000000",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "accounts"
+              ],
+              "query": [
+                {
+                  "key": "filter[annualRevenue][gte]",
+                  "value": "1000000"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Filter (range: gte + lt, AND-ed)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "{{mediaType}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/accounts?filter[annualRevenue][gte]=1000000&filter[annualRevenue][lt]=5000000",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "accounts"
+              ],
+              "query": [
+                {
+                  "key": "filter[annualRevenue][gte]",
+                  "value": "1000000"
+                },
+                {
+                  "key": "filter[annualRevenue][lt]",
+                  "value": "5000000"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Filter (in: comma-separated list)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "{{mediaType}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/accounts?filter[industry][in]=Technology,Finance",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "accounts"
+              ],
+              "query": [
+                {
+                  "key": "filter[industry][in]",
+                  "value": "Technology,Finance"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Filter (like: wildcard)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "{{mediaType}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/accounts?filter[name][like]=Ac%25",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "accounts"
+              ],
+              "query": [
+                {
+                  "key": "filter[name][like]",
+                  "value": "Ac%25"
                 }
               ]
             }
@@ -972,6 +1110,33 @@
               "query": [
                 {
                   "key": "filter[bogus]",
+                  "value": "x"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "400 - unsupported filter operator",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "{{mediaType}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/accounts?filter[industry][bogusop]=x",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "accounts"
+              ],
+              "query": [
+                {
+                  "key": "filter[industry][bogusop]",
                   "value": "x"
                 }
               ]

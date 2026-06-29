@@ -4,7 +4,7 @@ A configuration-driven Apex framework that exposes Salesforce SObjects over a RE
 API conforming to the [JSON:API v1.1 specification](https://jsonapi.org/format/).
 
 Describe each SObject once (its type name, fields, and relationships) and the
-framework handles routing, CRUD, sparse fieldsets, sorting, filtering, pagination,
+framework handles routing, sparse fieldsets, sorting, filtering, pagination,
 compound documents (`include`), content negotiation, and spec-compliant errors —
 all enforced under the running user's CRUD/FLS via `AccessLevel.USER_MODE`.
 
@@ -19,7 +19,8 @@ all enforced under the running user's CRUD/FLS via `AccessLevel.USER_MODE`.
 
 - ⚠️ **Read-only:** GET-only framework; `POST`/`PATCH`/`DELETE` are not supported
   and return `405`.
-- ✅ **Validated:** Apex tests passing with healthy org-wide coverage (clean scratch org).
+- ✅ **Validated:** 75 Apex tests passing, **94% org-wide coverage** with every
+  framework class ≥89% (clean scratch org).
 - ✅ **Deployed & confirmed live** — GET (sparse fieldsets, pagination, `include`
   compound documents) and error responses verified against a real org.
 
@@ -35,10 +36,11 @@ all enforced under the running user's CRUD/FLS via `AccessLevel.USER_MODE`.
 | Attribute groups      | `?extend=financials,contactInfo` (opt into extra groups beyond `base`) |
 | Sparse fieldsets      | `?fields[accounts]=name,industry`                              |
 | Sorting               | `?sort=-annualRevenue,name`                                    |
-| Filtering             | `?filter[industry]=Technology`                                |
+| Filtering             | `?filter[industry]=Technology`; operators via `?filter[annualRevenue][gte]=1000000` (`eq`/`ne`/`gt`/`gte`/`lt`/`lte`/`like`/`in`/`nin`) |
 | Pagination            | `?page[size]=10&page[number]=2` or `?page[limit]=10&page[offset]=20` |
 | Content negotiation   | `application/vnd.api+json` (415 / 406 enforcement)            |
 | Error documents       | Spec-compliant `errors[]` with HTTP status, code, source pointer |
+| Health/diagnostics    | `GET /_health` — registered resources + any registration failures (`200`/`503`) |
 
 Two example resources ship out of the box: **`accounts`** (Account) and
 **`contacts`** (Contact).
@@ -59,7 +61,7 @@ sf project deploy start -d force-app -o my-org
 # Run the framework's tests
 sf apex run test -o my-org -l RunSpecifiedTests `
   -t JsonApiServiceTest -t JsonApiRequestParserTest `
-  -t JsonApiRestResourceTest -t JsonApiCoverageTest -c
+  -t JsonApiRestResourceTest -t JsonApiCoverageTest -t JsonApiUnitTest -c
 ```
 
 ### Call it
@@ -88,7 +90,7 @@ curl "$INSTANCE_URL/services/apexrest/jsonapi/accounts?fields[accounts]=name,ind
 ### Manual testing
 
 Ready-to-run request collections covering every endpoint and option for both
-example resources (reads, writes, includes, `extend`, pagination, error cases):
+example resources (reads, includes, `extend`, filtering, pagination, error cases):
 
 - [`docs/manual-tests.http`](docs/manual-tests.http) — for the VS Code **REST Client**
   extension (`humao.rest-client`); click "Send Request" above any request.
@@ -119,6 +121,6 @@ That's it — the new type is live. Full walkthrough in the
 - `sfdx-project.json` — Salesforce DX configuration
 - `config/project-scratch-def.json` — scratch org definition
 - `docs/TECHNICAL.md` — detailed technical/architecture documentation
-- `force-app/main/default/classes/` — the framework (23 classes) + tests + docs
+- `force-app/main/default/classes/` — the framework (27 classes) + tests + docs
 - `force-app/main/default/objects/JsonApiResource__mdt/` — the resource-registration Custom Metadata Type
 - `force-app/main/default/customMetadata/` — one `JsonApiResource` record per exposed resource

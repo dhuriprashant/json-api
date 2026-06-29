@@ -4,7 +4,7 @@ A small, configuration-driven framework that exposes Salesforce SObjects over a
 REST API conforming to the [JSON:API v1.1 specification](https://jsonapi.org/format/).
 
 You describe each SObject once (its type name, fields, and relationships) and the
-framework handles routing, CRUD, sparse fieldsets, sorting, filtering, pagination,
+framework handles routing, sparse fieldsets, sorting, filtering, pagination,
 compound documents (`include`), content negotiation and spec-compliant errors.
 
 All data access runs in `AccessLevel.USER_MODE`, so object- and field-level
@@ -20,7 +20,7 @@ security is enforced by the platform for the running user.
 
 - ⚠️ **Read-only:** this is a GET-only framework. `POST`/`PATCH`/`DELETE` are not
   implemented and are rejected with `405 Method Not Allowed`.
-- ✅ **Apex tests passing** with healthy org-wide coverage (clean scratch org).
+- ✅ **75 Apex tests passing**, 94% org-wide coverage, every framework class ≥89% (clean scratch org).
 - ✅ **Confirmed live** against a real org — sparse fieldsets, pagination,
   `include` compound documents, relationship linkage and error responses all
   verified end-to-end over HTTP.
@@ -262,7 +262,7 @@ structured debug line; route it elsewhere (Platform Event, custom object, …) w
 # RunSpecifiedTests is used so unrelated failing tests in the org don't block validation.
 sf project deploy validate -d force-app -o <your-org> -l RunSpecifiedTests `
   -t JsonApiServiceTest -t JsonApiRequestParserTest `
-  -t JsonApiRestResourceTest -t JsonApiCoverageTest
+  -t JsonApiRestResourceTest -t JsonApiCoverageTest -t JsonApiUnitTest
 
 # Deploy for real
 sf project deploy start -d force-app -o <your-org>
@@ -270,10 +270,12 @@ sf project deploy start -d force-app -o <your-org>
 # Run just this framework's tests (with code coverage)
 sf apex run test -o <your-org> -l RunSpecifiedTests -c `
   -t JsonApiServiceTest -t JsonApiRequestParserTest `
-  -t JsonApiRestResourceTest -t JsonApiCoverageTest
+  -t JsonApiRestResourceTest -t JsonApiCoverageTest -t JsonApiUnitTest
 ```
 
-> **Note:** the framework's tests insert `Account`/`Contact` records. If the
-> target org has a broken Account/Contact trigger, those inserts fail — that's an
-> org issue, not a framework one. Deploy with `-l NoTestRun` and validate in a
-> clean scratch org instead.
+> **Note:** three of the suites (`JsonApiServiceTest`, `JsonApiRestResourceTest`,
+> `JsonApiCoverageTest`) insert `Account`/`Contact` records, so a broken
+> Account/Contact trigger in the target org will fail them — an org issue, not a
+> framework one. `JsonApiUnitTest` and `JsonApiRequestParserTest` are DML-free and
+> run anywhere. Deploy with `-l NoTestRun` and validate the full suite in a clean
+> scratch org.

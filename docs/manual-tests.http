@@ -25,6 +25,16 @@
 
 
 ###############################################################################
+# DIAGNOSTICS
+###############################################################################
+
+### Health — registered resources + any registration failures (200 ok / 503 degraded)
+GET {{baseUrl}}/_health
+Authorization: Bearer {{token}}
+Accept: {{mediaType}}
+
+
+###############################################################################
 # ACCOUNTS — reads
 ###############################################################################
 
@@ -50,6 +60,26 @@ Accept: {{mediaType}}
 
 ### Filter (equality)
 GET {{baseUrl}}/accounts?filter[industry]=Technology
+Authorization: Bearer {{token}}
+Accept: {{mediaType}}
+
+### Filter (operator: greater-than-or-equal)
+GET {{baseUrl}}/accounts?filter[annualRevenue][gte]=1000000
+Authorization: Bearer {{token}}
+Accept: {{mediaType}}
+
+### Filter (range: two conditions on one attribute, AND-ed)
+GET {{baseUrl}}/accounts?filter[annualRevenue][gte]=1000000&filter[annualRevenue][lt]=5000000
+Authorization: Bearer {{token}}
+Accept: {{mediaType}}
+
+### Filter (in: comma-separated list)
+GET {{baseUrl}}/accounts?filter[industry][in]=Technology,Finance
+Authorization: Bearer {{token}}
+Accept: {{mediaType}}
+
+### Filter (like: wildcard)
+GET {{baseUrl}}/accounts?filter[name][like]=Ac%25
 Authorization: Bearer {{token}}
 Accept: {{mediaType}}
 
