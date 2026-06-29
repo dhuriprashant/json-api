@@ -10,6 +10,8 @@ all enforced under the running user's CRUD/FLS via `AccessLevel.USER_MODE`.
 
 > 📖 **Usage reference** (endpoints, query params, examples, how to add a resource):
 > [`force-app/main/default/classes/JSON-API-README.md`](force-app/main/default/classes/JSON-API-README.md)
+> 🛠️ **Developer guide** (adding resources, internals, dev workflow, extending & maintaining):
+> [`docs/DEVELOPER_GUIDE.md`](docs/DEVELOPER_GUIDE.md)
 > 🏗️ **Technical design** (architecture, request lifecycle, internals, security):
 > [`docs/TECHNICAL.md`](docs/TECHNICAL.md)
 
