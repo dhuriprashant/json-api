@@ -94,6 +94,147 @@ private class JsonApiUnitTest {
         System.assert(((List<String>) r.document.meta.get('resources')).contains('accounts'));
     }
 
+    // ---- Query builder: typed coercion of filter values ----
+
+    @IsTest
+    static void builderCoercesNumericScalarAndListFilters() {
+        JsonApiQueryOptions opts = new JsonApiQueryOptions();
+        opts.filters.add(new JsonApiQueryOptions.FilterCondition('annualRevenue', 'gt', '1000000'));
+        opts.filters.add(new JsonApiQueryOptions.FilterCondition('annualRevenue', 'in', '1.5,2.5'));
+        opts.filters.add(new JsonApiQueryOptions.FilterCondition('numberOfEmployees', 'in', '10,20'));
+
+        JsonApiQueryBuilder b = new JsonApiQueryBuilder(new AccountResourceConfig(), opts);
+        String soql = b.buildCollectionQuery();
+
+        System.assert(soql.contains('AnnualRevenue > :'), soql);
+        System.assert(soql.contains('AnnualRevenue IN :'), soql);
+        System.assert(soql.contains('NumberOfEmployees IN :'), soql);
+        // Scalar currency coerces to Double; the IN lists are typed (not List<Object>).
+        System.assert(b.binds.get('f0') instanceof Double, 'scalar currency -> Double');
+        System.assert(b.binds.get('f1') instanceof List<Double>, 'currency list -> List<Double>');
+        System.assert(b.binds.get('f2') instanceof List<Integer>, 'employee list -> List<Integer>');
+    }
+
+    @IsTest
+    static void builderRejectsBadNumericScalarFilter() {
+        JsonApiQueryOptions opts = new JsonApiQueryOptions();
+        opts.filters.add(new JsonApiQueryOptions.FilterCondition('annualRevenue', 'gt', 'not-a-number'));
+        assertBuilderBadRequest(opts);
+    }
+
+    @IsTest
+    static void builderRejectsBadNumericListFilter() {
+        JsonApiQueryOptions opts = new JsonApiQueryOptions();
+        opts.filters.add(new JsonApiQueryOptions.FilterCondition('numberOfEmployees', 'in', 'x,y'));
+        assertBuilderBadRequest(opts);
+    }
+
+    private static void assertBuilderBadRequest(JsonApiQueryOptions opts) {
+        try {
+            new JsonApiQueryBuilder(new AccountResourceConfig(), opts).buildCollectionQuery();
+            System.assert(false, 'expected a 400');
+        } catch (JsonApiException e) {
+            System.assertEquals(400, e.httpStatus);
+        }
+    }
+
+    // ---- Service routing (DML-free, via the in-memory gateway) ----
+
+    private static JsonApiTestQueryGateway routingGateway() {
+        Id accId = fakeId(Account.SObjectType, 1);
+        Account acc = new Account(Name = 'Acme');
+        acc.Id = accId;
+        Contact con = new Contact(LastName = 'Doe', AccountId = accId);
+        con.Id = fakeId(Contact.SObjectType, 1);
+        return new JsonApiTestQueryGateway()
+            .seed(Account.SObjectType, new List<SObject>{ acc })
+            .seed(Contact.SObjectType, new List<SObject>{ con });
+    }
+
+    @IsTest
+    static void emptySegmentsIsBadRequest() {
+        try {
+            new JsonApiService(new JsonApiTestQueryGateway())
+                .handle('GET', new List<String>(), new Map<String, String>());
+            System.assert(false, 'expected a 400');
+        } catch (JsonApiException e) {
+            System.assertEquals(400, e.httpStatus);
+        }
+    }
+
+    @IsTest
+    static void invalidIdFormatIsBadRequest() {
+        try {
+            new JsonApiService(routingGateway()).handle(
+                'GET', new List<String>{ 'accounts', 'not-an-id' }, new Map<String, String>());
+            System.assert(false, 'expected a 400');
+        } catch (JsonApiException e) {
+            System.assertEquals(400, e.httpStatus);
+        }
+    }
+
+    @IsTest
+    static void relatedToOneReturnsResource() {
+        Id conId = fakeId(Contact.SObjectType, 1);
+        JsonApiResponse r = new JsonApiService(routingGateway()).handle(
+            'GET', new List<String>{ 'contacts', conId, 'account' }, new Map<String, String>());
+
+        System.assertEquals(200, r.statusCode);
+        JsonApiResourceObject obj = (JsonApiResourceObject) r.document.data;
+        System.assertEquals('accounts', obj.type);
+    }
+
+    @IsTest
+    static void relatedToManyReturnsCollection() {
+        Id accId = fakeId(Account.SObjectType, 1);
+        JsonApiResponse r = new JsonApiService(routingGateway()).handle(
+            'GET', new List<String>{ 'accounts', accId, 'contacts' }, new Map<String, String>());
+
+        System.assertEquals(200, r.statusCode);
+        List<JsonApiResourceObject> data = (List<JsonApiResourceObject>) r.document.data;
+        System.assertEquals(1, data.size());
+        System.assertEquals('contacts', data[0].type);
+    }
+
+    @IsTest
+    static void toManyLinkageReturnsIdentifiers() {
+        Id accId = fakeId(Account.SObjectType, 1);
+        JsonApiResponse r = new JsonApiService(routingGateway()).handle(
+            'GET', new List<String>{ 'accounts', accId, 'relationships', 'contacts' },
+            new Map<String, String>());
+
+        System.assertEquals(200, r.statusCode);
+        List<JsonApiResourceIdentifier> ids = (List<JsonApiResourceIdentifier>) r.document.data;
+        System.assertEquals(1, ids.size());
+        System.assertEquals('contacts', ids[0].type);
+    }
+
+    @IsTest
+    static void unknownRelatedRelationshipIsNotFound() {
+        assertRoutingNotFound(new List<String>{ 'accounts', fakeId(Account.SObjectType, 1), 'bogus' });
+    }
+
+    @IsTest
+    static void unknownLinkageRelationshipIsNotFound() {
+        assertRoutingNotFound(new List<String>{
+            'accounts', fakeId(Account.SObjectType, 1), 'relationships', 'bogus' });
+    }
+
+    @IsTest
+    static void unrecognizedPathShapeIsNotFound() {
+        assertRoutingNotFound(new List<String>{
+            'accounts', fakeId(Account.SObjectType, 1), 'foo', 'bar' });
+    }
+
+    private static void assertRoutingNotFound(List<String> segments) {
+        try {
+            new JsonApiService(routingGateway()).handle('GET', segments, new Map<String, String>());
+            System.assert(false, 'expected a 404');
+        } catch (JsonApiException e) {
+            System.assertEquals(404, e.httpStatus);
+        }
+    }
+
     @IsTest
     static void errorSourceFactoriesSetTheRightMember() {
         JsonApiErrorSource byPointer = JsonApiErrorSource.forPointer('/data/id');

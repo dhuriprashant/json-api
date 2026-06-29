@@ -7,8 +7,6 @@ public class JsonApiResourceIdentifier {
     public String id;
     public Map<String, Object> meta;
 
-    public JsonApiResourceIdentifier() {}
-
     public JsonApiResourceIdentifier(String type, String id) {
         this.type = type;
         this.id = id;

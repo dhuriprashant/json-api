@@ -31,6 +31,43 @@ private class JsonApiRestResourceTest {
     }
 
     @IsTest
+    static void getsSingleResourceViaDoGet() {
+        Id id = [SELECT Id FROM Account WHERE Name = 'Acme' LIMIT 1].Id;
+        newRequest('GET', '/services/apexrest/jsonapi/accounts/' + id);
+
+        JsonApiRestResource.doGet();
+
+        System.assertEquals(200, RestContext.response.statusCode);
+        String body = RestContext.response.responseBody.toString();
+        System.assert(body.contains('"type":"accounts"'), body);
+    }
+
+    @IsTest
+    static void getsToManyLinkageViaDoGet() {
+        Account acc = [SELECT Id FROM Account WHERE Name = 'Acme' LIMIT 1];
+        insert new Contact(FirstName = 'Jane', LastName = 'Doe', AccountId = acc.Id);
+        newRequest('GET',
+            '/services/apexrest/jsonapi/accounts/' + acc.Id + '/relationships/contacts');
+
+        JsonApiRestResource.doGet();
+
+        System.assertEquals(200, RestContext.response.statusCode);
+        String body = RestContext.response.responseBody.toString();
+        // A to-many linkage document's data is an array of identifier objects.
+        System.assert(body.contains('"data":['), body);
+    }
+
+    @IsTest
+    static void exactMediaTypeAcceptIsAccepted() {
+        RestRequest req = newRequest('GET', '/services/apexrest/jsonapi/accounts');
+        req.addHeader('Accept', JsonApiConstants.MEDIA_TYPE);
+
+        JsonApiRestResource.doGet();
+
+        System.assertEquals(200, RestContext.response.statusCode);
+    }
+
+    @IsTest
     static void unknownTypeRendersErrorDocument() {
         newRequest('GET', '/services/apexrest/jsonapi/widgets');
 
