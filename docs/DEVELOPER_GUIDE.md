@@ -31,13 +31,13 @@ it maps to, which fields are exposed, how it relates to other resources — live
 a small **config class** plus a **Custom Metadata record**.
 
 ```
-A request for /jsonapi/accounts
+A request for /jsonapi/v1/accounts
         │
         ▼
-  JsonApiRegistry.forType("accounts")  ──►  AccountResourceConfig   (your config)
-        │                                          │
-        ▼                                          ▼
-  the generic engine (parsing, SOQL,        getType(), getSObjectType(),
+  JsonApiRegistry.forType("v1", "accounts")  ──►  AccountResourceConfig   (your config)
+        │                                              │
+        ▼                                              ▼
+  the generic engine (parsing, SOQL,        getVersion(), getType(), getSObjectType(),
   serialization, includes, errors)          getAttributeGroups(), getRelationships()
 ```
 
@@ -113,9 +113,13 @@ And the meta file `OpportunityResourceConfig.cls-meta.xml`:
 
 | Method | Returns | Rules |
 |--------|---------|-------|
-| `getType()` | the `type` string, e.g. `'opportunities'` | lowercase, plural by convention; this is the URL segment and the `type` in every resource object |
+| `getType()` | the `type` string, e.g. `'opportunities'` | lowercase, plural by convention; this is a URL segment and the `type` in every resource object |
 | `getSObjectType()` | `Schema.SObjectType` | the backing object |
 | `getAttributeGroups()` | `Map<String, Map<String,String>>` | group name → ( jsonapi attribute name → SObject field API name ). **Must** contain a `base` group. **Never** map `id` here — it's handled automatically. |
+
+Versions are normally declared on the CMDT record (`Versions__c`, comma-separated) —
+see [§5, Adding a new version](#recipe-a-new-version-of-a-resource). The virtual
+`getVersion()` (default `'v1'`) is only the fallback used when `Versions__c` is blank.
 
 ### Step 2 — Understand attribute groups
 
@@ -129,9 +133,9 @@ while richer data is available on demand:
   when present it selects the exact attributes and `extend` is ignored for that type.
 
 ```
-GET /opportunities/006...                     → name, stage
-GET /opportunities/006...?extend=details      → name, stage, amount, closeDate
-GET /opportunities/006...?fields[opportunities]=amount  → amount only
+GET /v1/opportunities/006...                     → name, stage
+GET /v1/opportunities/006...?extend=details      → name, stage, amount, closeDate
+GET /v1/opportunities/006...?fields[opportunities]=amount  → amount only
 ```
 
 `resolveAttributeNames(options)` on the base class is the **single source of truth**
@@ -158,7 +162,7 @@ JsonApiRelationshipDef.toMany('lineItems', 'opportunityLineItems', 'OpportunityI
 - **to-one** linkage is inlined into the primary resource's `relationships` and can
   be side-loaded with `?include=account`.
 - **to-many** linkage is *not* inlined into primary `data`; it's reached via the
-  relationship endpoints (`/opportunities/{id}/relationships/lineItems`) and can be
+  relationship endpoints (`/v1/opportunities/{id}/relationships/lineItems`) and can be
   side-loaded with `?include=lineItems`.
 
 ### Step 4 — Register it with a Custom Metadata record
@@ -179,13 +183,15 @@ Create `force-app/main/default/customMetadata/JsonApiResource.Opportunities.md-m
         <field>Is_Active__c</field>
         <value xsi:type="xsd:boolean">true</value>
     </values>
+    <!-- Optional Versions__c: comma-separated versions, e.g. v1,v2. Blank -> getVersion() (v1). -->
 </CustomMetadata>
 ```
 
 `JsonApiBootstrap.registerAll()` reads every **active** `JsonApiResource__mdt` record
-on first use and instantiates each `Apex_Class__c` via `Type.forName().newInstance()`.
-No framework code changes. Uncheck `Is_Active__c` to disable an endpoint without
-deleting the record.
+on first use and instantiates each `Apex_Class__c` via `Type.forName().newInstance()`,
+registering it once per version in `Versions__c` (or the config's `getVersion()` when
+blank). No framework code changes. Uncheck `Is_Active__c` to disable an endpoint
+without deleting the record.
 
 ### Step 5 — Deploy & verify
 
@@ -216,7 +222,7 @@ static void serializesOpportunity() {
         .seed(Opportunity.SObjectType, new List<SObject>{ opp });
 
     JsonApiResponse r = new JsonApiService(mock).handle(
-        'GET', new List<String>{ 'opportunities', oppId }, new Map<String, String>());
+        'GET', new List<String>{ 'v1', 'opportunities', oppId }, new Map<String, String>());
 
     JsonApiResourceObject obj = (JsonApiResourceObject) r.document.data;
     System.assertEquals('Big Deal', obj.attributes.get('name'));
@@ -276,13 +282,20 @@ with no handler, and `JsonApiService.handle` also rejects any non-GET with `405`
 
 The routing table maps verb + path shape to an operation:
 
+`handle()` first strips the leading `{version}` segment (storing it and building a
+version-scoped serializer), then routes the remaining `type/id/...` shape:
+
 ```
-GET /{type}                          → getCollection
-GET /{type}/{id}                     → getSingle
-GET /{type}/{id}/{relationship}      → getRelated         (resource or collection)
-GET /{type}/{id}/relationships/{rel} → getRelationshipLinkage  (identifier objects)
-GET /_health                         → health             (matched BEFORE registry lookup)
+GET /{version}/{type}                          → getCollection
+GET /{version}/{type}/{id}                     → getSingle
+GET /{version}/{type}/{id}/{relationship}      → getRelated         (resource or collection)
+GET /{version}/{type}/{id}/relationships/{rel} → getRelationshipLinkage  (identifier objects)
+GET /_health                                   → health   (unversioned; matched first)
 ```
+
+The stored version scopes every registry lookup — the primary config, relationship
+targets, and includes all resolve within the same version — and the serializer's
+base URL (`BASE_PATH + '/' + version`) makes every generated link version-correct.
 
 All data access goes through a `JsonApiQueryGateway`. The default constructor wires
 the production `JsonApiUserModeGateway`; a `@TestVisible` constructor accepts an
@@ -290,8 +303,10 @@ in-memory gateway so the whole service can be unit-tested without DML.
 
 ### 3.3 Registry & config resolution
 
-`JsonApiRegistry.forType(type)` resolves the type string to its config, throwing
-`404` if unregistered. The registry **lazily self-initializes** by calling
+`JsonApiRegistry.forType(version, type)` resolves the `version/type` pair to its
+config, throwing `404` if unregistered. A config's version comes from `getVersion()`
+(default `v1`), so the same type can be registered under several versions from
+different config classes. The registry **lazily self-initializes** by calling
 `JsonApiBootstrap.registerAll()` on the first lookup — no load-order dependency, and
 nothing to wire up at deploy time.
 
@@ -405,8 +420,8 @@ A pure Apex Salesforce DX project — no LWC, no JS build.
 
 ```
 force-app/main/default/
-  classes/            # 27 framework classes + 6 test classes + JSON-API-README.md
-  objects/JsonApiResource__mdt/   # the registration Custom Metadata Type + 2 fields
+  classes/            # 28 framework classes + 6 test classes + JSON-API-README.md
+  objects/JsonApiResource__mdt/   # the registration Custom Metadata Type + 3 fields
   customMetadata/     # one JsonApiResource.*.md-meta.xml per exposed resource
 config/project-scratch-def.json   # scratch org definition
 docs/                 # TECHNICAL.md, this guide, manual-tests.http, Postman collection
@@ -490,11 +505,55 @@ sf apex run test -o jsonapi-scratch -l RunSpecifiedTests -c -w 15 `
 | To add… | Do this |
 |---------|---------|
 | A new resource | Subclass `JsonApiResourceConfig` + add a `JsonApiResource__mdt` record. ([§2](#2-adding-a-new-resource--full-walkthrough)) |
+| A new version of a resource | A second config class overriding `getVersion()` + its own CMDT record. ([recipe below](#recipe-a-new-version-of-a-resource)) |
 | A new attribute group | Add a key to the resource's `getAttributeGroups()`. Clients opt in with `?extend=`. |
 | A new filter operator | Add a `when` branch in `JsonApiQueryBuilder.buildClause()` **and** the operator name to `FILTER_OPERATORS` in `JsonApiRequestParser`. |
 | Custom telemetry sink | Implement `JsonApiObserver`; register with `JsonApiObservability.setObserver(...)`. |
 | A different data-access policy | Implement `JsonApiQueryGateway`; inject via the service constructor. (Keep `USER_MODE`.) |
 | A new error condition | Add a factory to `JsonApiException`. |
+
+### Recipe: a new version of a resource
+
+There are two cases.
+
+**The resource is unchanged in the new version** — carry one config across versions
+via the CMDT. Set `Versions__c` on its `JsonApiResource__mdt` record to a
+comma-separated list and the *same* config instance is registered under each:
+
+```xml
+<values><field>Versions__c</field><value xsi:type="xsd:string">v1,v2</value></values>
+```
+
+That's the whole change — no new Apex. The shipped `Contacts` record does exactly
+this, so `/v1/contacts` and `/v2/contacts` are the same resource. Its `account`
+relationship still resolves per-version (`v1/accounts` vs `v2/accounts`).
+
+**The resource differs between versions** — write a second config class and its own
+record:
+
+1. **New config class** diverging however you need (add/remove attributes, change
+   relationships). See `AccountV2ResourceConfig`, which adds `rating` to `base`:
+   ```apex
+   public with sharing class AccountV2ResourceConfig extends JsonApiResourceConfig {
+       public override String getType()    { return 'accounts'; }   // same type
+       public override Schema.SObjectType getSObjectType() { return Account.SObjectType; }
+       public override Map<String, Map<String, String>> getAttributeGroups() {
+           return new Map<String, Map<String, String>>{
+               'base' => new Map<String,String>{ 'name'=>'Name', 'industry'=>'Industry', 'rating'=>'Rating' }
+           };
+       }
+   }
+   ```
+2. **New CMDT record** pointing at it with `Versions__c = "v2"`
+   (`JsonApiResource.AccountsV2.md-meta.xml`) — the registry keys on `version/type`, so
+   `v1/accounts` and `v2/accounts` coexist. (The version is declared on the record, not
+   in code — `getVersion()` is only the fallback default.)
+3. It's live at `/jsonapi/v2/accounts`. Relationships and includes resolve **within
+   the requested version**, so any relationship target must also exist in v2 — either
+   its own v2 config, or (if unchanged) the same config carried forward with
+   `Versions__c`. The shipped `AccountV2ResourceConfig` keeps a `contacts`
+   relationship precisely because the `Contacts` record lists `Versions__c = "v1,v2"`,
+   so `v2/contacts` resolves.
 
 ### Recipe: a new filter operator (`between`)
 

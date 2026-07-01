@@ -81,16 +81,17 @@ reference, see [`JSON-API-README.md`](../force-app/main/default/classes/JSON-API
 
 ## 3. Request lifecycle (end to end)
 
-Tracing `GET /services/apexrest/jsonapi/accounts/001.../?include=parent&fields[accounts]=name`:
+Tracing `GET /services/apexrest/jsonapi/v1/accounts/001.../?include=parent&fields[accounts]=name`:
 
 1. **Entry** — `JsonApiRestResource.doGet()` (the only HTTP handler) runs the request directly.
 2. **Content negotiation** — `negotiate()` accepts `application/json` or unparameterized `application/vnd.api+json`. Response is always `application/json` with JSON:API document structure.
-3. **Path split** — `segmentsOf(requestURI)` finds the `jsonapi` base token and returns the URL-decoded segments after it: `['accounts', '001...']`.
+3. **Path split** — `segmentsOf(requestURI)` finds the `jsonapi` base token and returns the URL-decoded segments after it: `['v1', 'accounts', '001...']` (the first is the API version).
 4. **Service dispatch** — `JsonApiService.handle('GET', segments, params)`:
    - any non-GET verb → `405`;
-   - the reserved `_health` segment short-circuits to the diagnostics document (before any registry lookup);
-   - `JsonApiRegistry.forType('accounts')` resolves the config (lazy-initializing the registry via `JsonApiBootstrap` on first call). Unknown type → `404`.
-   - routes by path shape → `handleGet()`.
+   - the reserved `_health` segment short-circuits to the diagnostics document (before version handling);
+   - the leading `v1` segment is taken as the **API version**, stripped, and used to build a version-scoped serializer (`BASE_PATH + '/v1'`);
+   - `JsonApiRegistry.forType('v1', 'accounts')` resolves the config (lazy-initializing the registry via `JsonApiBootstrap` on first call). Unknown version/type → `404`.
+   - routes the remaining `type/id/...` by path shape → `handleGet()`.
 5. **Parse query** — `JsonApiRequestParser.parse(params, config)` produces `JsonApiQueryOptions`. Unknown sort/filter/include names are rejected with `400` here, before any SOQL exists.
 6. **Build & run SOQL** — for a single record, `JsonApiQueryBuilder.buildSingleQuery(id)` produces `SELECT Id, Name, ParentId FROM Account WHERE Id = :recordId LIMIT 1` with `binds = {recordId}`. Executed via `Database.queryWithBinds(..., AccessLevel.USER_MODE)`.
 7. **Serialize** — `JsonApiSerializer.toResource()` maps fields → attributes (honoring sparse `fields[accounts]=name`), emits to-one relationship linkage from the `ParentId` value, and adds a `self` link.
@@ -102,7 +103,7 @@ Tracing `GET /services/apexrest/jsonapi/accounts/001.../?include=parent&fields[a
 
 ### Sequence diagram
 
-A `GET /jsonapi/accounts/{id}?include=parent` request through the layers:
+A `GET /jsonapi/v1/accounts/{id}?include=parent` request through the layers:
 
 ```mermaid
 sequenceDiagram
@@ -117,14 +118,14 @@ sequenceDiagram
     participant Ser as JsonApiSerializer
     participant Inc as JsonApiIncludeResolver
 
-    Client->>REST: GET /accounts/{id}?include=parent
+    Client->>REST: GET /v1/accounts/{id}?include=parent
     activate REST
     REST->>REST: negotiate(Accept)
     REST->>REST: segmentsOf(uri) -> [accounts, id]
     REST->>Svc: handle GET, segments, params
     activate Svc
 
-    Svc->>Reg: forType(accounts)
+    Svc->>Reg: forType(v1, accounts)
     Reg-->>Svc: config (404 if unknown)
     Svc->>Parser: parse(params, config)
     Parser-->>Svc: QueryOptions (400 if invalid param)
@@ -205,7 +206,10 @@ are opt-in through the `extend` query param. Two helpers drive selection:
 
 ### Registry & bootstrap
 
-`JsonApiRegistry` keeps two maps (`byType`, `bySObject`). `ensureInitialized()`
+`JsonApiRegistry` keys configs by `version/type` (a config's version comes from
+`getVersion()`, default `v1`), so the same type can be registered under several
+versions from different config classes (e.g. `AccountResourceConfig` →
+`v1/accounts`, `AccountV2ResourceConfig` → `v2/accounts`). `ensureInitialized()`
 lazily calls `JsonApiBootstrap.registerAll()` on the first lookup, so there is no
 load-order dependency. `@TestVisible reset()` supports test isolation.
 
@@ -216,10 +220,15 @@ Registration is **data-driven via the `JsonApiResource__mdt` Custom Metadata Typ
 | `DeveloperName` / `Label` | Human-readable record name (e.g. `Accounts`). |
 | `Apex_Class__c` (Text, required) | API name of the `JsonApiResourceConfig` subclass. |
 | `Is_Active__c` (Checkbox) | When unchecked, the resource is skipped — disable without deleting. |
+| `Versions__c` (Text) | Comma-separated versions the config is exposed under, e.g. `v1,v2`. Blank → the config's `getVersion()` (defaults to `v1`). |
 
 `registerAll()` queries the active records and, for each, resolves the class with
 `Type.forName(Apex_Class__c)` and `newInstance()`, validates it `instanceof
-JsonApiResourceConfig`, and registers it. Registration is **fault-isolated**: each
+JsonApiResourceConfig`, and registers it **once per version** in `Versions__c` (the
+same config instance can back several `version/type` keys — this is how one resource
+is carried across versions unchanged; the shipped `Contacts` record uses
+`Versions__c = "v1,v2"`). A config that *differs* between versions is instead a
+separate class with its own record (e.g. `AccountV2ResourceConfig`). Registration is **fault-isolated**: each
 record is wrapped in its own try/catch, so a misconfigured one (unknown class, no
 public no-arg constructor, or a class that doesn't extend the base) is *skipped* —
 the reason is logged at `ERROR` and recorded in
@@ -337,7 +346,7 @@ buildTree(paths):  fold dotted paths into nested {relName -> node}
 walk(parents, parentConfig, node):
     for relName in node.children:
         def       = parentConfig.relationshipFor(relName)     // 400 if unknown
-        targetCfg = Registry.forType(def.targetType)
+        targetCfg = Registry.forType(version, def.targetType)
         related   = fetchRelated(parents, def, targetCfg)     // ONE bulk query
         for r in related: included[type:id] = serialize(r)    // dedupe by key
         walk(related, targetCfg, node.children[relName])      // descend once
@@ -540,7 +549,7 @@ and **never throws** — a broken observer can't break the response. The default
 for failures, INFO otherwise), e.g.:
 
 ```
-JSONAPI {"requestId":"4ab..","method":"GET","resourceType":"accounts","path":"/services/apexrest/jsonapi/accounts","statusCode":200,"durationMs":42,"soqlQueries":2,"rows":9}
+JSONAPI {"requestId":"4ab..","method":"GET","apiVersion":"v1","resourceType":"accounts","path":"/services/apexrest/jsonapi/v1/accounts","statusCode":200,"durationMs":42,"soqlQueries":2,"rows":9}
 ```
 
 To ship telemetry somewhere durable (Platform Event, custom object, external

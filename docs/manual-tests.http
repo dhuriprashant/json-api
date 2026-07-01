@@ -18,6 +18,9 @@
 
 @instanceUrl = https://YOUR_DOMAIN.my.salesforce.com
 @baseUrl     = {{instanceUrl}}/services/apexrest/jsonapi
+# Resources live under a version segment; _health is unversioned (uses {{baseUrl}}).
+@v1          = {{baseUrl}}/v1
+@v2          = {{baseUrl}}/v2
 @token       = REPLACE_WITH_ACCESS_TOKEN
 @accountId   = REPLACE_WITH_ACCOUNT_ID
 @accountId2  = REPLACE_WITH_ANOTHER_ACCOUNT_ID
@@ -40,117 +43,132 @@ Accept: {{mediaType}}
 ###############################################################################
 
 ### List accounts
-GET {{baseUrl}}/accounts
+GET {{v1}}/accounts
 Authorization: Bearer {{token}}
 Accept: {{mediaType}}
 
 ### Single account
-GET {{baseUrl}}/accounts/{{accountId}}
+GET {{v1}}/accounts/{{accountId}}
 Authorization: Bearer {{token}}
 Accept: {{mediaType}}
 
 ### Sort (descending name)
-GET {{baseUrl}}/accounts?sort=-name
+GET {{v1}}/accounts?sort=-name
 Authorization: Bearer {{token}}
 Accept: {{mediaType}}
 
 ### Sort (multi: industry asc, name desc)
-GET {{baseUrl}}/accounts?sort=industry,-name
+GET {{v1}}/accounts?sort=industry,-name
 Authorization: Bearer {{token}}
 Accept: {{mediaType}}
 
 ### Filter (equality)
-GET {{baseUrl}}/accounts?filter[industry]=Technology
+GET {{v1}}/accounts?filter[industry]=Technology
 Authorization: Bearer {{token}}
 Accept: {{mediaType}}
 
 ### Filter (operator: greater-than-or-equal)
-GET {{baseUrl}}/accounts?filter[annualRevenue][gte]=1000000
+GET {{v1}}/accounts?filter[annualRevenue][gte]=1000000
 Authorization: Bearer {{token}}
 Accept: {{mediaType}}
 
 ### Filter (range: two conditions on one attribute, AND-ed)
-GET {{baseUrl}}/accounts?filter[annualRevenue][gte]=1000000&filter[annualRevenue][lt]=5000000
+GET {{v1}}/accounts?filter[annualRevenue][gte]=1000000&filter[annualRevenue][lt]=5000000
 Authorization: Bearer {{token}}
 Accept: {{mediaType}}
 
 ### Filter (in: comma-separated list)
-GET {{baseUrl}}/accounts?filter[industry][in]=Technology,Finance
+GET {{v1}}/accounts?filter[industry][in]=Technology,Finance
 Authorization: Bearer {{token}}
 Accept: {{mediaType}}
 
 ### Filter (like: wildcard)
-GET {{baseUrl}}/accounts?filter[name][like]=Ac%25
+GET {{v1}}/accounts?filter[name][like]=Ac%25
 Authorization: Bearer {{token}}
 Accept: {{mediaType}}
 
 ### Filter by id (comma-separated -> IN)
-GET {{baseUrl}}/accounts?filter[id]={{accountId}},{{accountId2}}
+GET {{v1}}/accounts?filter[id]={{accountId}},{{accountId2}}
 Authorization: Bearer {{token}}
 Accept: {{mediaType}}
 
 ### Sparse fieldsets
-GET {{baseUrl}}/accounts?fields[accounts]=name,phone
+GET {{v1}}/accounts?fields[accounts]=name,phone
 Authorization: Bearer {{token}}
 Accept: {{mediaType}}
 
 ### Pagination (page-based)
-GET {{baseUrl}}/accounts?page[size]=5&page[number]=2
+GET {{v1}}/accounts?page[size]=5&page[number]=2
 Authorization: Bearer {{token}}
 Accept: {{mediaType}}
 
 ### Pagination (offset-based)
-GET {{baseUrl}}/accounts?page[limit]=5&page[offset]=10
+GET {{v1}}/accounts?page[limit]=5&page[offset]=10
 Authorization: Bearer {{token}}
 Accept: {{mediaType}}
 
 ### Extend — financials group
-GET {{baseUrl}}/accounts/{{accountId}}?extend=financials
+GET {{v1}}/accounts/{{accountId}}?extend=financials
 Authorization: Bearer {{token}}
 Accept: {{mediaType}}
 
 ### Extend — multiple groups
-GET {{baseUrl}}/accounts/{{accountId}}?extend=financials,contactInfo
+GET {{v1}}/accounts/{{accountId}}?extend=financials,contactInfo
 Authorization: Bearer {{token}}
 Accept: {{mediaType}}
 
 ### Include — to-one (parent)
-GET {{baseUrl}}/accounts/{{accountId}}?include=parent
+GET {{v1}}/accounts/{{accountId}}?include=parent
 Authorization: Bearer {{token}}
 Accept: {{mediaType}}
 
 ### Include — to-many (contacts)
-GET {{baseUrl}}/accounts/{{accountId}}?include=contacts
+GET {{v1}}/accounts/{{accountId}}?include=contacts
 Authorization: Bearer {{token}}
 Accept: {{mediaType}}
 
 ### Include — nested (contacts.account)
-GET {{baseUrl}}/accounts/{{accountId}}?include=contacts.account
+GET {{v1}}/accounts/{{accountId}}?include=contacts.account
 Authorization: Bearer {{token}}
 Accept: {{mediaType}}
 
 ### Combined (filter + sort + extend + page)
-GET {{baseUrl}}/accounts?filter[industry]=Technology&sort=-name&extend=financials&page[size]=3
+GET {{v1}}/accounts?filter[industry]=Technology&sort=-name&extend=financials&page[size]=3
 Authorization: Bearer {{token}}
 Accept: {{mediaType}}
 
 ### Related — to-one (parent)
-GET {{baseUrl}}/accounts/{{accountId}}/parent
+GET {{v1}}/accounts/{{accountId}}/parent
 Authorization: Bearer {{token}}
 Accept: {{mediaType}}
 
 ### Related — to-many (contacts)
-GET {{baseUrl}}/accounts/{{accountId}}/contacts
+GET {{v1}}/accounts/{{accountId}}/contacts
 Authorization: Bearer {{token}}
 Accept: {{mediaType}}
 
 ### Relationship linkage — to-one (parent)
-GET {{baseUrl}}/accounts/{{accountId}}/relationships/parent
+GET {{v1}}/accounts/{{accountId}}/relationships/parent
 Authorization: Bearer {{token}}
 Accept: {{mediaType}}
 
 ### Relationship linkage — to-many (contacts)
-GET {{baseUrl}}/accounts/{{accountId}}/relationships/contacts
+GET {{v1}}/accounts/{{accountId}}/relationships/contacts
+Authorization: Bearer {{token}}
+Accept: {{mediaType}}
+
+
+###############################################################################
+# ACCOUNTS — v2 (same type, different version: base adds `rating`)
+###############################################################################
+
+### List accounts (v2)
+GET {{v2}}/accounts
+Authorization: Bearer {{token}}
+Accept: {{mediaType}}
+
+### Single account (v2) — response includes the extra `rating` attribute
+GET {{v2}}/accounts/{{accountId}}
 Authorization: Bearer {{token}}
 Accept: {{mediaType}}
 
@@ -160,62 +178,62 @@ Accept: {{mediaType}}
 ###############################################################################
 
 ### List contacts
-GET {{baseUrl}}/contacts
+GET {{v1}}/contacts
 Authorization: Bearer {{token}}
 Accept: {{mediaType}}
 
 ### Single contact
-GET {{baseUrl}}/contacts/{{contactId}}
+GET {{v1}}/contacts/{{contactId}}
 Authorization: Bearer {{token}}
 Accept: {{mediaType}}
 
 ### Sort (lastName)
-GET {{baseUrl}}/contacts?sort=lastName
+GET {{v1}}/contacts?sort=lastName
 Authorization: Bearer {{token}}
 Accept: {{mediaType}}
 
 ### Filter
-GET {{baseUrl}}/contacts?filter[lastName]=Doe
+GET {{v1}}/contacts?filter[lastName]=Doe
 Authorization: Bearer {{token}}
 Accept: {{mediaType}}
 
 ### Sparse fieldsets
-GET {{baseUrl}}/contacts?fields[contacts]=firstName,lastName
+GET {{v1}}/contacts?fields[contacts]=firstName,lastName
 Authorization: Bearer {{token}}
 Accept: {{mediaType}}
 
 ### Pagination
-GET {{baseUrl}}/contacts?page[size]=5&page[number]=1
+GET {{v1}}/contacts?page[size]=5&page[number]=1
 Authorization: Bearer {{token}}
 Accept: {{mediaType}}
 
 ### Extend — contactInfo group
-GET {{baseUrl}}/contacts/{{contactId}}?extend=contactInfo
+GET {{v1}}/contacts/{{contactId}}?extend=contactInfo
 Authorization: Bearer {{token}}
 Accept: {{mediaType}}
 
 ### Extend — multiple groups
-GET {{baseUrl}}/contacts/{{contactId}}?extend=contactInfo,professional
+GET {{v1}}/contacts/{{contactId}}?extend=contactInfo,professional
 Authorization: Bearer {{token}}
 Accept: {{mediaType}}
 
 ### Include — to-one (account)
-GET {{baseUrl}}/contacts/{{contactId}}?include=account
+GET {{v1}}/contacts/{{contactId}}?include=account
 Authorization: Bearer {{token}}
 Accept: {{mediaType}}
 
 ### Include — nested (account.contacts)
-GET {{baseUrl}}/contacts/{{contactId}}?include=account.contacts
+GET {{v1}}/contacts/{{contactId}}?include=account.contacts
 Authorization: Bearer {{token}}
 Accept: {{mediaType}}
 
 ### Related — to-one (account)
-GET {{baseUrl}}/contacts/{{contactId}}/account
+GET {{v1}}/contacts/{{contactId}}/account
 Authorization: Bearer {{token}}
 Accept: {{mediaType}}
 
 ### Relationship linkage — to-one (account)
-GET {{baseUrl}}/contacts/{{contactId}}/relationships/account
+GET {{v1}}/contacts/{{contactId}}/relationships/account
 Authorization: Bearer {{token}}
 Accept: {{mediaType}}
 
@@ -225,36 +243,36 @@ Accept: {{mediaType}}
 ###############################################################################
 
 ### 404 — unknown type
-GET {{baseUrl}}/widgets
+GET {{v1}}/widgets
 Authorization: Bearer {{token}}
 Accept: {{mediaType}}
 
 ### 404 — unknown id
-GET {{baseUrl}}/accounts/001000000000000
+GET {{v1}}/accounts/001000000000000
 Authorization: Bearer {{token}}
 Accept: {{mediaType}}
 
 ### 400 — bad sort field
-GET {{baseUrl}}/accounts?sort=bogus
+GET {{v1}}/accounts?sort=bogus
 Authorization: Bearer {{token}}
 Accept: {{mediaType}}
 
 ### 400 — bad extend group
-GET {{baseUrl}}/accounts?extend=bogus
+GET {{v1}}/accounts?extend=bogus
 Authorization: Bearer {{token}}
 Accept: {{mediaType}}
 
 ### 400 — bad filter field
-GET {{baseUrl}}/accounts?filter[bogus]=x
+GET {{v1}}/accounts?filter[bogus]=x
 Authorization: Bearer {{token}}
 Accept: {{mediaType}}
 
 ### 405 — write method not allowed (read-only API)
-POST {{baseUrl}}/accounts
+POST {{v1}}/accounts
 Authorization: Bearer {{token}}
 Accept: {{mediaType}}
 
 ### 406 — parameterized Accept media type
-GET {{baseUrl}}/accounts
+GET {{v1}}/accounts
 Authorization: Bearer {{token}}
 Accept: application/vnd.api+json; charset=utf-8

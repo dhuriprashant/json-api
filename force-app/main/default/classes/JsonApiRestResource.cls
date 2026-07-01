@@ -25,7 +25,13 @@ global with sharing class JsonApiRestResource {
         JsonApiRequestLog log = new JsonApiRequestLog();
         log.method = 'GET';
         log.path = req.requestURI;
-        log.resourceType = segments.isEmpty() ? null : segments[0];
+        // Path is /{version}/{type}/... except the unversioned /_health route.
+        if (!segments.isEmpty() && segments[0] == JsonApiConstants.HEALTH_PATH) {
+            log.resourceType = JsonApiConstants.HEALTH_PATH;
+        } else {
+            log.apiVersion = segments.isEmpty() ? null : segments[0];
+            log.resourceType = segments.size() > 1 ? segments[1] : null;
+        }
         log.requestId = System.Request.getCurrent().getRequestId();
 
         try {

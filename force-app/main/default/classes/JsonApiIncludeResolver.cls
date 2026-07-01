@@ -11,10 +11,12 @@ public with sharing class JsonApiIncludeResolver {
 
     private final JsonApiSerializer serializer;
     private final JsonApiQueryGateway gateway;
+    private final String version;
 
-    public JsonApiIncludeResolver(JsonApiSerializer serializer, JsonApiQueryGateway gateway) {
+    public JsonApiIncludeResolver(JsonApiSerializer serializer, JsonApiQueryGateway gateway, String version) {
         this.serializer = serializer;
         this.gateway = gateway;
+        this.version = version;
     }
 
     /** A node in the coalesced include tree: relationship name -> sub-paths. */
@@ -67,7 +69,7 @@ public with sharing class JsonApiIncludeResolver {
                     'Cannot include unknown relationship "' + relName + '".',
                     JsonApiErrorSource.forParameter(JsonApiConstants.PARAM_INCLUDE));
             }
-            JsonApiResourceConfig targetConfig = JsonApiRegistry.forType(def.targetType);
+            JsonApiResourceConfig targetConfig = JsonApiRegistry.forType(version, def.targetType);
             List<SObject> related = fetchRelated(parents, def, targetConfig, options);
 
             for (SObject r : related) {

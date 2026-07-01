@@ -33,15 +33,21 @@ security is enforced by the platform for the running user.
 
 ## Endpoints
 
-Everything is served under `/services/apexrest/jsonapi`.
+Everything is served under `/services/apexrest/jsonapi`, and every resource lives
+under an **API version** — the first path segment (e.g. `v1`, `v2`). The same type
+can be exposed in several versions with different attributes/relationships.
 
-| Method   | Path                                       | Action                       |
-|----------|--------------------------------------------|------------------------------|
-| `GET`    | `/{type}`                                  | List a collection            |
-| `GET`    | `/{type}/{id}`                             | Fetch one resource           |
-| `GET`    | `/{type}/{id}/{relationship}`              | Fetch related resource(s)    |
-| `GET`    | `/{type}/{id}/relationships/{relationship}`| Fetch relationship linkage   |
-| `GET`    | `/_health`                                 | Framework diagnostics (see below) |
+| Method   | Path                                                 | Action                       |
+|----------|------------------------------------------------------|------------------------------|
+| `GET`    | `/{version}/{type}`                                  | List a collection            |
+| `GET`    | `/{version}/{type}/{id}`                             | Fetch one resource           |
+| `GET`    | `/{version}/{type}/{id}/{relationship}`              | Fetch related resource(s)    |
+| `GET`    | `/{version}/{type}/{id}/relationships/{relationship}`| Fetch relationship linkage   |
+| `GET`    | `/_health`                                           | Framework diagnostics (unversioned; see below) |
+
+Ships with **`v1`** (`accounts`, `contacts`) and a **`v2`** of `accounts` that adds
+a `rating` attribute — demonstrating multiple versions of one type. Relationships
+and `include` resolve within the requested version.
 
 `POST`, `PATCH` and `DELETE` are not supported (read-only framework) and return
 `405 Method Not Allowed`.
@@ -67,14 +73,14 @@ Everything is served under `/services/apexrest/jsonapi`.
 **List, sorted and filtered, with only two fields:**
 
 ```
-GET /services/apexrest/jsonapi/accounts?filter[industry]=Technology&sort=-name&fields[accounts]=name,industry
+GET /services/apexrest/jsonapi/v1/accounts?filter[industry]=Technology&sort=-name&fields[accounts]=name,industry
 Accept: application/json
 ```
 
 **Fetch one account and side-load its parent:**
 
 ```
-GET /services/apexrest/jsonapi/accounts/001.../?include=parent
+GET /services/apexrest/jsonapi/v1/accounts/001.../?include=parent
 ```
 
 ```json
@@ -90,7 +96,7 @@ GET /services/apexrest/jsonapi/accounts/001.../?include=parent
         "data": { "type": "accounts", "id": "001PARENT..." }
       }
     },
-    "links": { "self": "/services/apexrest/jsonapi/accounts/001..." }
+    "links": { "self": "/services/apexrest/jsonapi/v1/accounts/001..." }
   },
   "included": [
     { "type": "accounts", "id": "001PARENT...", "attributes": { "name": "Parent Co" } }
@@ -151,9 +157,9 @@ For example, `AccountResourceConfig` defines:
 | `financials`  | `annualRevenue`, `numberOfEmployees`|
 
 ```
-GET /accounts/001...                              → name, industry
-GET /accounts/001...?extend=financials            → name, industry, annualRevenue, numberOfEmployees
-GET /accounts/001...?extend=financials,contactInfo → all six attributes
+GET /v1/accounts/001...                              → name, industry
+GET /v1/accounts/001...?extend=financials            → name, industry, annualRevenue, numberOfEmployees
+GET /v1/accounts/001...?extend=financials,contactInfo → all six attributes
 ```
 
 Notes:
@@ -172,6 +178,7 @@ Notes:
 
 ```apex
 public with sharing class OpportunityResourceConfig extends JsonApiResourceConfig {
+    // getVersion() defaults to "v1"; override it to expose under another version.
     public override String getType() { return 'opportunities'; }
     public override Schema.SObjectType getSObjectType() { return Opportunity.SObjectType; }
     // "base" is always returned; other groups only when named in ?extend=...
@@ -202,10 +209,16 @@ public with sharing class OpportunityResourceConfig extends JsonApiResourceConfi
        <protected>false</protected>
        <values><field>Apex_Class__c</field><value xsi:type="xsd:string">OpportunityResourceConfig</value></values>
        <values><field>Is_Active__c</field><value xsi:type="xsd:boolean">true</value></values>
+       <!-- Optional: expose under specific versions (comma-separated). Blank -> getVersion() (v1). -->
+       <!-- <values><field>Versions__c</field><value xsi:type="xsd:string">v1,v2</value></values> -->
    </CustomMetadata>
    ```
 
-That's it — the new type is live at `/services/apexrest/jsonapi/opportunities`.
+That's it — the new type is live at `/services/apexrest/jsonapi/v1/opportunities`
+(the default version). To expose it under **more versions unchanged**, set
+`Versions__c` to a comma-separated list (e.g. `v1,v2`) on the record — the one config
+is registered under each. To offer a version that **differs**, add a second config
+class overriding `getVersion()` plus its own record (see `AccountV2ResourceConfig`).
 `JsonApiBootstrap` reads all active `JsonApiResource__mdt` records on first use and
 instantiates each `Apex_Class__c` via reflection. Uncheck `Is_Active__c` to disable
 an endpoint without deleting the record. Registration is fault-isolated: a record

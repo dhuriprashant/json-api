@@ -20,10 +20,12 @@ private class JsonApiServiceTest {
         return [SELECT Id FROM Account WHERE Name = 'Acme' LIMIT 1];
     }
 
-    // 4th arg (body) is ignored — the API is read-only — but kept so existing
-    // GET call sites need no change.
+    // Prepends the "v1" version segment (these tests target v1) and ignores the
+    // 4th arg (body) — the API is read-only — so existing GET call sites are unchanged.
     private static JsonApiResponse handle(String method, List<String> segments, Map<String, String> params, String body) {
-        return new JsonApiService().handle(method, segments, params);
+        List<String> versioned = new List<String>{ 'v1' };
+        versioned.addAll(segments);
+        return new JsonApiService().handle(method, versioned, params);
     }
 
     @IsTest
@@ -184,6 +186,79 @@ private class JsonApiServiceTest {
             got.add(o.id);
         }
         System.assert(got.contains(String.valueOf(acme)) && got.contains(String.valueOf(globex)), got + '');
+    }
+
+    @IsTest
+    static void versionedResourcesExposeDifferentAttributes() {
+        Id id = acme().Id;
+
+        // v1 base: name, industry (no rating).
+        JsonApiResponse v1 = new JsonApiService().handle('GET',
+            new List<String>{ 'v1', 'accounts', id }, new Map<String, String>());
+        JsonApiResourceObject v1obj = (JsonApiResourceObject) v1.document.data;
+        System.assert(v1obj.attributes.containsKey('name'));
+        System.assert(!v1obj.attributes.containsKey('rating'), 'v1 must not expose rating');
+        System.assert(((String) v1obj.links.get('self')).contains('/jsonapi/v1/accounts/'),
+            'v1 self link is version-scoped: ' + v1obj.links.get('self'));
+
+        // v2 base adds rating, and links are v2-scoped.
+        JsonApiResponse v2 = new JsonApiService().handle('GET',
+            new List<String>{ 'v2', 'accounts', id }, new Map<String, String>());
+        JsonApiResourceObject v2obj = (JsonApiResourceObject) v2.document.data;
+        System.assert(v2obj.attributes.containsKey('rating'), 'v2 must expose rating');
+        System.assert(((String) v2obj.links.get('self')).contains('/jsonapi/v2/accounts/'),
+            'v2 self link is version-scoped: ' + v2obj.links.get('self'));
+    }
+
+    @IsTest
+    static void contactsAvailableInBothVersions() {
+        // One config (ContactResourceConfig) serves v1 and v2 via CMDT Versions__c.
+        JsonApiResponse v1 = new JsonApiService().handle('GET',
+            new List<String>{ 'v1', 'contacts' }, new Map<String, String>());
+        System.assertEquals(200, v1.statusCode);
+
+        JsonApiResponse v2 = new JsonApiService().handle('GET',
+            new List<String>{ 'v2', 'contacts' }, new Map<String, String>());
+        System.assertEquals(200, v2.statusCode);
+    }
+
+    @IsTest
+    static void v2AccountSideLoadsV2Contacts() {
+        Id id = acme().Id;
+        JsonApiResponse r = new JsonApiService().handle('GET',
+            new List<String>{ 'v2', 'accounts', id },
+            new Map<String, String>{ 'include' => 'contacts' });
+
+        System.assertEquals(200, r.statusCode);
+        Boolean hasContact = false;
+        if (r.document.included != null) {
+            for (JsonApiResourceObject o : r.document.included) {
+                hasContact = hasContact || o.type == 'contacts';
+            }
+        }
+        System.assert(hasContact, 'v2 account side-loads v2 contacts (config shared across versions)');
+    }
+
+    @IsTest
+    static void unknownVersionIsNotFound() {
+        try {
+            new JsonApiService().handle('GET',
+                new List<String>{ 'v9', 'accounts' }, new Map<String, String>());
+            System.assert(false, 'expected a 404 for an unregistered version');
+        } catch (JsonApiException e) {
+            System.assertEquals(404, e.httpStatus);
+        }
+    }
+
+    @IsTest
+    static void missingResourceAfterVersionIsBadRequest() {
+        try {
+            new JsonApiService().handle('GET',
+                new List<String>{ 'v1' }, new Map<String, String>());
+            System.assert(false, 'expected a 400 when only a version is given');
+        } catch (JsonApiException e) {
+            System.assertEquals(400, e.httpStatus);
+        }
     }
 
     @IsTest

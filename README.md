@@ -32,8 +32,9 @@ all enforced under the running user's CRUD/FLS via `AccessLevel.USER_MODE`.
 
 | Capability            | Example                                                        |
 |-----------------------|----------------------------------------------------------------|
-| Read (GET)            | `GET /{type}` and `GET /{type}/{id}` _(writes gated off for now → 405)_ |
-| Relationships         | `GET /{type}/{id}/{relationship}` and `.../relationships/{rel}`|
+| API versioning        | `GET /{version}/{type}` — same type can live in `v1`, `v2`, … with different fields |
+| Read (GET)            | `GET /{version}/{type}` and `GET /{version}/{type}/{id}` _(writes gated off for now → 405)_ |
+| Relationships         | `GET /{version}/{type}/{id}/{relationship}` and `.../relationships/{rel}`|
 | Compound documents    | `?include=parent,contacts` (supports nested, e.g. `contacts.account`) |
 | Attribute groups      | `?extend=financials,contactInfo` (opt into extra groups beyond `base`) |
 | Sparse fieldsets      | `?fields[accounts]=name,industry`                              |
@@ -44,8 +45,9 @@ all enforced under the running user's CRUD/FLS via `AccessLevel.USER_MODE`.
 | Error documents       | Spec-compliant `errors[]` with HTTP status, code, source pointer |
 | Health/diagnostics    | `GET /_health` — registered resources + any registration failures (`200`/`503`) |
 
-Two example resources ship out of the box: **`accounts`** (Account) and
-**`contacts`** (Contact).
+Example resources ship out of the box under **`v1`** — **`accounts`** (Account) and
+**`contacts`** (Contact) — plus a **`v2`** of `accounts` that adds a `rating`
+attribute, demonstrating multiple versions of one type.
 
 ---
 
@@ -71,9 +73,9 @@ sf apex run test -o my-org -l RunSpecifiedTests `
 The API is served under `/services/apexrest/jsonapi`.
 
 ```bash
-curl "$INSTANCE_URL/services/apexrest/jsonapi/accounts?fields[accounts]=name,industry&page[size]=10" \
+curl "$INSTANCE_URL/services/apexrest/jsonapi/v1/accounts?fields[accounts]=name,industry&page[size]=10" \
   -H "Authorization: Bearer $ACCESS_TOKEN" \
-  -H "Accept: application/vnd.api+json"
+  -H "Accept: application/json"
 ```
 
 ```json
@@ -84,7 +86,7 @@ curl "$INSTANCE_URL/services/apexrest/jsonapi/accounts?fields[accounts]=name,ind
   "data": [
     { "type": "accounts", "id": "001...",
       "attributes": { "name": "Acme", "industry": "Technology" },
-      "links": { "self": "/services/apexrest/jsonapi/accounts/001..." } }
+      "links": { "self": "/services/apexrest/jsonapi/v1/accounts/001..." } }
   ]
 }
 ```
@@ -123,6 +125,6 @@ That's it — the new type is live. Full walkthrough in the
 - `sfdx-project.json` — Salesforce DX configuration
 - `config/project-scratch-def.json` — scratch org definition
 - `docs/TECHNICAL.md` — detailed technical/architecture documentation
-- `force-app/main/default/classes/` — the framework (27 classes) + tests + docs
+- `force-app/main/default/classes/` — the framework (28 classes) + tests + docs
 - `force-app/main/default/objects/JsonApiResource__mdt/` — the resource-registration Custom Metadata Type
 - `force-app/main/default/customMetadata/` — one `JsonApiResource` record per exposed resource

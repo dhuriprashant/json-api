@@ -1,21 +1,28 @@
 /**
  * Central lookup of all registered {@link JsonApiResourceConfig}s, keyed by
- * JSON:API type and by SObjectType. {@link JsonApiBootstrap} populates it on
- * first use.
+ * (version, JSON:API type). {@link JsonApiBootstrap} populates it on first use.
+ * The same type may be registered under several versions (e.g. v1/accounts and
+ * v2/accounts), each backed by its own config class.
  */
 public with sharing class JsonApiRegistry {
-    private static Map<String, JsonApiResourceConfig> byType =
-        new Map<String, JsonApiResourceConfig>();
-    private static Map<String, JsonApiResourceConfig> bySObject =
+    private static Map<String, JsonApiResourceConfig> byKey =
         new Map<String, JsonApiResourceConfig>();
     private static Boolean initialized = false;
 
+    /** Composite key: lowercased "version/type". */
+    private static String keyOf(String version, String type) {
+        return (version == null ? '' : version.toLowerCase()) + '/' +
+               (type == null ? '' : type.toLowerCase());
+    }
+
+    /** Registers a config under its own {@code getVersion()}. */
     public static void register(JsonApiResourceConfig config) {
-        byType.put(config.getType().toLowerCase(), config);
-        bySObject.put(
-            String.valueOf(config.getSObjectType()).toLowerCase(),
-            config
-        );
+        registerFor(config.getVersion(), config);
+    }
+
+    /** Registers a config under an explicit version (a config may serve several). */
+    public static void registerFor(String version, JsonApiResourceConfig config) {
+        byKey.put(keyOf(version, config.getType()), config);
     }
 
     /** Ensures the registry has been populated before any lookup. */
@@ -26,42 +33,35 @@ public with sharing class JsonApiRegistry {
         }
     }
 
-    /** Returns the config for a JSON:API type, or throws 404 if unknown. */
-    public static JsonApiResourceConfig forType(String type) {
+    /** Returns the config for a (version, type), or throws 404 if unknown. */
+    public static JsonApiResourceConfig forType(String version, String type) {
         ensureInitialized();
-        JsonApiResourceConfig config = byType.get(
-            type == null ? null : type.toLowerCase()
-        );
+        JsonApiResourceConfig config = byKey.get(keyOf(version, type));
         if (config == null) {
-            throw JsonApiException.notFound('No resource is registered for type "' + type + '".');
+            throw JsonApiException.notFound(
+                'No resource is registered for type "' + type + '" in version "' + version + '".');
         }
         return config;
     }
 
-    public static JsonApiResourceConfig forSObjectType(Schema.SObjectType sObjType) {
+    public static Boolean isRegistered(String version, String type) {
         ensureInitialized();
-        return bySObject.get(String.valueOf(sObjType).toLowerCase());
+        return byKey.containsKey(keyOf(version, type));
     }
 
-    public static Boolean isRegistered(String type) {
-        ensureInitialized();
-        return byType.containsKey(type == null ? null : type.toLowerCase());
-    }
-
-    /** Sorted JSON:API type names of every successfully registered resource.
+    /** Sorted "version/type" keys of every successfully registered resource.
      *  Forces initialization, so callers also see any registration errors. */
     public static List<String> registeredTypes() {
         ensureInitialized();
-        List<String> types = new List<String>(byType.keySet());
-        types.sort();
-        return types;
+        List<String> keys = new List<String>(byKey.keySet());
+        keys.sort();
+        return keys;
     }
 
     /** Test hook: clears the registry and forces re-initialization. */
     @TestVisible
     private static void reset() {
-        byType.clear();
-        bySObject.clear();
+        byKey.clear();
         initialized = false;
     }
 }

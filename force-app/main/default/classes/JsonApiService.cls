@@ -6,19 +6,25 @@
  * This API is read-only: only GET is served. Any other method is rejected with
  * 405 Method Not Allowed.
  *
- * Routing table:
- *   GET    /{type}                          collection
- *   GET    /{type}/{id}                      single resource
- *   GET    /{type}/{id}/{relationship}       related resource(s)
- *   GET    /{type}/{id}/relationships/{rel}  relationship linkage
+ * Every resource lives under an API version, so the path is
+ * /jsonapi/{version}/{type}/... Relationships and includes resolve to configs in
+ * the same version. Routing table (after the version segment):
+ *   GET    /{version}/{type}                          collection
+ *   GET    /{version}/{type}/{id}                      single resource
+ *   GET    /{version}/{type}/{id}/{relationship}       related resource(s)
+ *   GET    /{version}/{type}/{id}/relationships/{rel}  relationship linkage
+ *   GET    /_health                                    diagnostics (unversioned)
  *
  * All SOQL runs in AccessLevel.USER_MODE, so object- and field-level security is
  * enforced by the platform on the running user's behalf.
  */
 public with sharing class JsonApiService {
 
-    private final JsonApiSerializer serializer = new JsonApiSerializer(JsonApiConstants.BASE_PATH);
     private final JsonApiQueryGateway gateway;
+    /** Set per request from the URL; scopes registry lookups and link generation. */
+    private String version;
+    /** Version-scoped serializer, built per request once the version is known. */
+    private JsonApiSerializer serializer;
 
     /** Production entry point — queries run in USER_MODE. */
     public JsonApiService() {
@@ -37,21 +43,31 @@ public with sharing class JsonApiService {
         Map<String, String> params
     ) {
         if (segments == null || segments.isEmpty()) {
-            throw JsonApiException.badRequest('A resource type is required in the path.', null);
+            throw JsonApiException.badRequest('An API version and resource type are required in the path.', null);
         }
         String verb = method == null ? '' : method.toUpperCase();
         if (verb != 'GET') {
             throw JsonApiException.methodNotAllowed('This API is read-only; only GET is supported.');
         }
 
-        // Diagnostics endpoint — not a resource type, so it must be matched
-        // before the registry lookup (which would 404 on "_health").
+        // Diagnostics endpoint is unversioned — matched before the version/registry
+        // handling (which would treat "_health" as a version and 404).
         if (segments[0] == JsonApiConstants.HEALTH_PATH) {
             return health();
         }
 
-        JsonApiResourceConfig config = JsonApiRegistry.forType(segments[0]);
-        return handleGet(config, segments, params);
+        // The first path segment is the API version: /jsonapi/{version}/{type}/...
+        this.version = segments[0];
+        List<String> resourceSegments = new List<String>(segments);
+        resourceSegments.remove(0);
+        if (resourceSegments.isEmpty()) {
+            throw JsonApiException.badRequest(
+                'A resource type is required after the version "' + version + '".', null);
+        }
+        this.serializer = new JsonApiSerializer(JsonApiConstants.BASE_PATH + '/' + version);
+
+        JsonApiResourceConfig config = JsonApiRegistry.forType(version, resourceSegments[0]);
+        return handleGet(config, resourceSegments, params);
     }
 
     /**
@@ -137,7 +153,7 @@ public with sharing class JsonApiService {
         if (def == null) {
             throw JsonApiException.notFound('No relationship "' + relName + '" on ' + config.getType() + '.');
         }
-        JsonApiResourceConfig targetConfig = JsonApiRegistry.forType(def.targetType);
+        JsonApiResourceConfig targetConfig = JsonApiRegistry.forType(version, def.targetType);
         JsonApiQueryOptions targetOptions = JsonApiRequestParser.parse(params, targetConfig);
         SObject parent = queryOne(config, id, new JsonApiQueryOptions());
         if (parent == null) {
@@ -164,7 +180,7 @@ public with sharing class JsonApiService {
             throw JsonApiException.notFound('No relationship "' + relName + '" on ' + config.getType() + '.');
         }
         if (def.isToMany) {
-            List<SObject> children = queryChildren(def, JsonApiRegistry.forType(def.targetType), id, new JsonApiQueryOptions());
+            List<SObject> children = queryChildren(def, JsonApiRegistry.forType(version, def.targetType), id, new JsonApiQueryOptions());
             List<JsonApiResourceIdentifier> ids = new List<JsonApiResourceIdentifier>();
             for (SObject c : children) {
                 ids.add(new JsonApiResourceIdentifier(def.targetType, String.valueOf(c.get('Id'))));
@@ -236,7 +252,7 @@ public with sharing class JsonApiService {
             return;
         }
         List<JsonApiResourceObject> included =
-            new JsonApiIncludeResolver(serializer, gateway).resolve(records, config, options);
+            new JsonApiIncludeResolver(serializer, gateway, version).resolve(records, config, options);
         if (!included.isEmpty()) {
             doc.included = included;
         }

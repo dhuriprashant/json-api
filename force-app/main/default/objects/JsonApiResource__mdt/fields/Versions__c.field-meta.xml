@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Versions__c</fullName>
+    <label>Versions</label>
+    <description>Comma-separated API versions this resource is exposed under (e.g. "v1,v2"). The config is registered once per version. Leave blank to use the config's getVersion() (which defaults to v1).</description>
+    <inlineHelpText>Comma-separated list, e.g. v1,v2. Blank = the config's getVersion() default.</inlineHelpText>
+    <type>Text</type>
+    <length>255</length>
+    <required>false</required>
+    <unique>false</unique>
+</CustomField>

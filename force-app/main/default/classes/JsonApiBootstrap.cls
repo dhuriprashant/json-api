@@ -21,7 +21,11 @@ public with sharing class JsonApiBootstrap {
         registrationErrors = new Map<String, String>();
         for (JsonApiResource__mdt record : loadConfigRecords()) {
             try {
-                JsonApiRegistry.register(instantiate(record.Apex_Class__c, record.DeveloperName));
+                JsonApiResourceConfig config = instantiate(record.Apex_Class__c, record.DeveloperName);
+                // A record may expose the same config under several versions.
+                for (String version : versionsFor(record, config)) {
+                    JsonApiRegistry.registerFor(version, config);
+                }
             } catch (Exception e) {
                 // One misconfigured record must not take down every endpoint:
                 // skip it, remember why, and keep loading the rest. A later
@@ -48,10 +52,30 @@ public with sharing class JsonApiBootstrap {
             return configOverride;
         }
         return [
-            SELECT DeveloperName, Apex_Class__c
+            SELECT DeveloperName, Apex_Class__c, Versions__c
             FROM JsonApiResource__mdt
             WHERE Is_Active__c = true
         ];
+    }
+
+    /**
+     * The versions a record is exposed under: the comma-separated {@code Versions__c}
+     * when set, otherwise the config's own {@code getVersion()} (defaults to v1).
+     */
+    private static List<String> versionsFor(JsonApiResource__mdt record, JsonApiResourceConfig config) {
+        List<String> versions = new List<String>();
+        if (String.isNotBlank(record.Versions__c)) {
+            for (String token : record.Versions__c.split(',')) {
+                String v = token.trim();
+                if (String.isNotBlank(v)) {
+                    versions.add(v);
+                }
+            }
+        }
+        if (versions.isEmpty()) {
+            versions.add(config.getVersion());
+        }
+        return versions;
     }
 
     private static JsonApiResourceConfig instantiate(String className, String developerName) {

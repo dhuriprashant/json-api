@@ -18,6 +18,8 @@ private class JsonApiCoverageTest {
     @IsTest
     static void resourceConfigHelpers() {
         JsonApiResourceConfig cfg = new AccountResourceConfig();
+        // getVersion() is only the fallback default; actual versions come from CMDT Versions__c.
+        System.assertEquals('v1', cfg.getVersion(), 'base default is v1');
         System.assertEquals('Name', cfg.fieldFor('name'));
         System.assert(cfg.hasAttribute('industry'));
         System.assert(!cfg.hasAttribute('nope'));
@@ -35,7 +37,7 @@ private class JsonApiCoverageTest {
     static void nestedIncludeResolvesBothLevels() {
         Id acctId = [SELECT Id FROM Account WHERE Name = 'Acme' LIMIT 1].Id;
         JsonApiResponse r = new JsonApiService().handle('GET',
-            new List<String>{ 'accounts', acctId },
+            new List<String>{ 'v1', 'accounts', acctId },
             new Map<String, String>{ 'include' => 'contacts.account' });
 
         System.assertEquals(200, r.statusCode);
@@ -55,7 +57,7 @@ private class JsonApiCoverageTest {
         // the resolver must fetch contacts ONCE, not once per path.
         Integer before = Limits.getQueries();
         JsonApiResponse r = new JsonApiService().handle('GET',
-            new List<String>{ 'accounts', acctId },
+            new List<String>{ 'v1', 'accounts', acctId },
             new Map<String, String>{ 'include' => 'contacts,contacts.account' });
         Integer used = Limits.getQueries() - before;
 
@@ -89,8 +91,23 @@ private class JsonApiCoverageTest {
     @IsTest
     static void bootstrapRegistersConfigsFromCmdt() {
         JsonApiRegistry.reset();
-        System.assert(JsonApiRegistry.isRegistered('accounts'), 'accounts registered from CMDT');
-        System.assert(JsonApiRegistry.isRegistered('contacts'), 'contacts registered from CMDT');
+        System.assert(JsonApiRegistry.isRegistered('v1', 'accounts'), 'accounts registered from CMDT');
+        System.assert(JsonApiRegistry.isRegistered('v1', 'contacts'), 'contacts registered from CMDT');
+        System.assert(JsonApiRegistry.isRegistered('v2', 'accounts'), 'accounts v2 registered from CMDT');
+        // Contacts record carries Versions__c = "v1,v2", so it registers under both.
+        System.assert(JsonApiRegistry.isRegistered('v2', 'contacts'), 'contacts v2 via Versions__c');
+    }
+
+    @IsTest
+    static void bootstrapRegistersConfigUnderMultipleVersions() {
+        JsonApiBootstrap.configOverride = new List<JsonApiResource__mdt>{
+            new JsonApiResource__mdt(DeveloperName = 'Contacts', Apex_Class__c = 'ContactResourceConfig',
+                Is_Active__c = true, Versions__c = 'v1, v2') // note the space — must be trimmed
+        };
+        JsonApiRegistry.reset();
+
+        System.assert(JsonApiRegistry.isRegistered('v1', 'contacts'), 'registered under v1');
+        System.assert(JsonApiRegistry.isRegistered('v2', 'contacts'), 'registered under v2');
     }
 
     @IsTest
@@ -102,7 +119,7 @@ private class JsonApiCoverageTest {
         };
         JsonApiRegistry.reset();
 
-        System.assert(JsonApiRegistry.isRegistered('accounts'), 'good record loaded despite a bad sibling');
+        System.assert(JsonApiRegistry.isRegistered('v1', 'accounts'), 'good record loaded despite a bad sibling');
         Map<String, String> errors = JsonApiBootstrap.getRegistrationErrors();
         System.assert(errors.containsKey('Bad'), 'bad record captured: ' + errors);
     }
@@ -116,7 +133,7 @@ private class JsonApiCoverageTest {
 
         // The skipped type resolves to a 404, not a 500.
         try {
-            JsonApiRegistry.forType('accounts');
+            JsonApiRegistry.forType('v1', 'accounts');
             System.assert(false, 'expected not-found');
         } catch (JsonApiException e) {
             System.assertEquals(404, e.httpStatus);
@@ -131,7 +148,7 @@ private class JsonApiCoverageTest {
             new JsonApiResource__mdt(DeveloperName = 'Bad', Apex_Class__c = 'JsonApiConstants', Is_Active__c = true)
         };
         JsonApiRegistry.reset();
-        JsonApiRegistry.isRegistered('accounts'); // force lazy initialization
+        JsonApiRegistry.isRegistered('v1', 'accounts'); // force lazy initialization
 
         System.assert(JsonApiBootstrap.getRegistrationErrors().containsKey('Bad'),
             'non-config class recorded as a registration error');

@@ -25,6 +25,16 @@ public abstract class JsonApiResourceConfig {
     private Map<String, JsonApiRelationshipDef> memoRels;
     private Map<String, Schema.SObjectField> memoFieldMap;
 
+    /**
+     * The API version this resource belongs to (the first path segment:
+     * /jsonapi/{version}/{type}). Defaults to {@link JsonApiConstants#DEFAULT_VERSION}.
+     * Override to expose a resource under a different version; register one config
+     * class per (version, type) pair to offer the same type in multiple versions.
+     */
+    public virtual String getVersion() {
+        return JsonApiConstants.DEFAULT_VERSION;
+    }
+
     /** The JSON:API `type` for this resource, e.g. "accounts". */
     public abstract String getType();
 

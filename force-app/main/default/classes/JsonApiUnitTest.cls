@@ -70,7 +70,7 @@ private class JsonApiUnitTest {
         System.assertEquals(200, r.statusCode);
         System.assertEquals('ok', r.document.meta.get('status'));
         System.assertEquals(0, ((Map<String, String>) r.document.meta.get('registrationErrors')).size());
-        System.assert(((List<String>) r.document.meta.get('resources')).contains('accounts'));
+        System.assert(((List<String>) r.document.meta.get('resources')).contains('v1/accounts'));
         // Meta-only document: no primary data member, not even an explicit null.
         System.assert(!r.document.toJson().contains('"data"'), r.document.toJson());
     }
@@ -91,7 +91,7 @@ private class JsonApiUnitTest {
         Map<String, String> errors = (Map<String, String>) r.document.meta.get('registrationErrors');
         System.assert(errors.containsKey('Bad'), 'bad record surfaced in health: ' + errors);
         // The healthy resource is still listed.
-        System.assert(((List<String>) r.document.meta.get('resources')).contains('accounts'));
+        System.assert(((List<String>) r.document.meta.get('resources')).contains('v1/accounts'));
     }
 
     // ---- Query builder: typed coercion of filter values ----
@@ -209,7 +209,7 @@ private class JsonApiUnitTest {
     static void invalidIdFormatIsBadRequest() {
         try {
             new JsonApiService(routingGateway()).handle(
-                'GET', new List<String>{ 'accounts', 'not-an-id' }, new Map<String, String>());
+                'GET', new List<String>{ 'v1', 'accounts', 'not-an-id' }, new Map<String, String>());
             System.assert(false, 'expected a 400');
         } catch (JsonApiException e) {
             System.assertEquals(400, e.httpStatus);
@@ -220,7 +220,7 @@ private class JsonApiUnitTest {
     static void relatedToOneReturnsResource() {
         Id conId = fakeId(Contact.SObjectType, 1);
         JsonApiResponse r = new JsonApiService(routingGateway()).handle(
-            'GET', new List<String>{ 'contacts', conId, 'account' }, new Map<String, String>());
+            'GET', new List<String>{ 'v1', 'contacts', conId, 'account' }, new Map<String, String>());
 
         System.assertEquals(200, r.statusCode);
         JsonApiResourceObject obj = (JsonApiResourceObject) r.document.data;
@@ -231,7 +231,7 @@ private class JsonApiUnitTest {
     static void relatedToManyReturnsCollection() {
         Id accId = fakeId(Account.SObjectType, 1);
         JsonApiResponse r = new JsonApiService(routingGateway()).handle(
-            'GET', new List<String>{ 'accounts', accId, 'contacts' }, new Map<String, String>());
+            'GET', new List<String>{ 'v1', 'accounts', accId, 'contacts' }, new Map<String, String>());
 
         System.assertEquals(200, r.statusCode);
         List<JsonApiResourceObject> data = (List<JsonApiResourceObject>) r.document.data;
@@ -243,7 +243,7 @@ private class JsonApiUnitTest {
     static void toManyLinkageReturnsIdentifiers() {
         Id accId = fakeId(Account.SObjectType, 1);
         JsonApiResponse r = new JsonApiService(routingGateway()).handle(
-            'GET', new List<String>{ 'accounts', accId, 'relationships', 'contacts' },
+            'GET', new List<String>{ 'v1', 'accounts', accId, 'relationships', 'contacts' },
             new Map<String, String>());
 
         System.assertEquals(200, r.statusCode);
@@ -254,19 +254,19 @@ private class JsonApiUnitTest {
 
     @IsTest
     static void unknownRelatedRelationshipIsNotFound() {
-        assertRoutingNotFound(new List<String>{ 'accounts', fakeId(Account.SObjectType, 1), 'bogus' });
+        assertRoutingNotFound(new List<String>{ 'v1', 'accounts', fakeId(Account.SObjectType, 1), 'bogus' });
     }
 
     @IsTest
     static void unknownLinkageRelationshipIsNotFound() {
         assertRoutingNotFound(new List<String>{
-            'accounts', fakeId(Account.SObjectType, 1), 'relationships', 'bogus' });
+            'v1', 'accounts', fakeId(Account.SObjectType, 1), 'relationships', 'bogus' });
     }
 
     @IsTest
     static void unrecognizedPathShapeIsNotFound() {
         assertRoutingNotFound(new List<String>{
-            'accounts', fakeId(Account.SObjectType, 1), 'foo', 'bar' });
+            'v1', 'accounts', fakeId(Account.SObjectType, 1), 'foo', 'bar' });
     }
 
     private static void assertRoutingNotFound(List<String> segments) {
@@ -299,7 +299,7 @@ private class JsonApiUnitTest {
             new JsonApiTestQueryGateway().seed(Account.SObjectType, new List<SObject>{ acc });
 
         JsonApiResponse r = new JsonApiService(mock).handle(
-            'GET', new List<String>{ 'accounts', accId }, new Map<String, String>());
+            'GET', new List<String>{ 'v1', 'accounts', accId }, new Map<String, String>());
 
         System.assertEquals(200, r.statusCode);
         JsonApiResourceObject obj = (JsonApiResourceObject) r.document.data;
@@ -322,7 +322,7 @@ private class JsonApiUnitTest {
         mock.countValue = 2;
 
         JsonApiResponse r = new JsonApiService(mock).handle(
-            'GET', new List<String>{ 'accounts' }, new Map<String, String>());
+            'GET', new List<String>{ 'v1', 'accounts' }, new Map<String, String>());
 
         List<JsonApiResourceObject> data = (List<JsonApiResourceObject>) r.document.data;
         System.assertEquals(2, data.size());
@@ -345,7 +345,7 @@ private class JsonApiUnitTest {
             .seed(Contact.SObjectType, new List<SObject>{ con });
 
         JsonApiResponse r = new JsonApiService(mock).handle(
-            'GET', new List<String>{ 'accounts', accId },
+            'GET', new List<String>{ 'v1', 'accounts', accId },
             new Map<String, String>{ 'include' => 'contacts' });
 
         System.assertEquals(200, r.statusCode);
@@ -370,7 +370,7 @@ private class JsonApiUnitTest {
             .seed(Account.SObjectType, new List<SObject>{ acc });
 
         JsonApiResponse r = new JsonApiService(mock).handle(
-            'GET', new List<String>{ 'contacts', conId },
+            'GET', new List<String>{ 'v1', 'contacts', conId },
             new Map<String, String>{ 'include' => 'account' });
 
         JsonApiResourceObject obj = (JsonApiResourceObject) r.document.data;
@@ -390,7 +390,7 @@ private class JsonApiUnitTest {
             new JsonApiTestQueryGateway().seed(Account.SObjectType, new List<SObject>{ acc });
 
         JsonApiResponse r = new JsonApiService(mock).handle(
-            'GET', new List<String>{ 'accounts', accId }, new Map<String, String>());
+            'GET', new List<String>{ 'v1', 'accounts', accId }, new Map<String, String>());
 
         JsonApiResourceObject obj = (JsonApiResourceObject) r.document.data;
         Map<String, Object> parentRel = (Map<String, Object>) obj.relationships.get('parent');
@@ -416,7 +416,7 @@ private class JsonApiUnitTest {
             new JsonApiTestQueryGateway().seed(Account.SObjectType, new List<SObject>{ acc });
 
         JsonApiResponse r = new JsonApiService(mock).handle(
-            'GET', new List<String>{ 'accounts', accId }, new Map<String, String>());
+            'GET', new List<String>{ 'v1', 'accounts', accId }, new Map<String, String>());
 
         JsonApiResourceObject obj = (JsonApiResourceObject) r.document.data;
         Map<String, Object> parentRel = (Map<String, Object>) obj.relationships.get('parent');
@@ -435,7 +435,7 @@ private class JsonApiUnitTest {
             new JsonApiTestQueryGateway().seed(Account.SObjectType, new List<SObject>{ acc });
 
         JsonApiResponse r = new JsonApiService(mock).handle(
-            'GET', new List<String>{ 'accounts', accId, 'relationships', 'parent' },
+            'GET', new List<String>{ 'v1', 'accounts', accId, 'relationships', 'parent' },
             new Map<String, String>());
 
         System.assertEquals(200, r.statusCode);

@@ -6,7 +6,9 @@ public class JsonApiRequestLog {
     /** Platform request id, for correlating with debug logs. */
     public String requestId;
     public String method;
-    /** First path segment, e.g. "accounts". */
+    /** API version segment, e.g. "v1". */
+    public String apiVersion;
+    /** The resource type segment, e.g. "accounts". */
     public String resourceType;
     /** Full request URI path. */
     public String path;

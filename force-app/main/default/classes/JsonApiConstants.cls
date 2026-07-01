@@ -28,6 +28,10 @@ public with sharing class JsonApiConstants {
     /** Reserved path segment for the diagnostics/health endpoint (not a resource type). */
     public static final String HEALTH_PATH = '_health';
 
+    /** Version a resource belongs to when its config does not override getVersion().
+     *  The URL is /jsonapi/{version}/{type}, e.g. /jsonapi/v1/accounts. */
+    public static final String DEFAULT_VERSION = 'v1';
+
     /** Reserved filter attribute for the resource id, and its SObject field. The id
      *  is never declared in attribute groups, so it is special-cased everywhere. */
     public static final String ID_ATTRIBUTE = 'id';

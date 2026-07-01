@@ -17,7 +17,7 @@ private class JsonApiRestResourceTest {
 
     @IsTest
     static void getCollectionReturnsJsonApiDocument() {
-        newRequest('GET', '/services/apexrest/jsonapi/accounts');
+        newRequest('GET', '/services/apexrest/jsonapi/v1/accounts');
 
         Test.startTest();
         JsonApiRestResource.doGet();
@@ -33,7 +33,7 @@ private class JsonApiRestResourceTest {
     @IsTest
     static void getsSingleResourceViaDoGet() {
         Id id = [SELECT Id FROM Account WHERE Name = 'Acme' LIMIT 1].Id;
-        newRequest('GET', '/services/apexrest/jsonapi/accounts/' + id);
+        newRequest('GET', '/services/apexrest/jsonapi/v1/accounts/' + id);
 
         JsonApiRestResource.doGet();
 
@@ -47,7 +47,7 @@ private class JsonApiRestResourceTest {
         Account acc = [SELECT Id FROM Account WHERE Name = 'Acme' LIMIT 1];
         insert new Contact(FirstName = 'Jane', LastName = 'Doe', AccountId = acc.Id);
         newRequest('GET',
-            '/services/apexrest/jsonapi/accounts/' + acc.Id + '/relationships/contacts');
+            '/services/apexrest/jsonapi/v1/accounts/' + acc.Id + '/relationships/contacts');
 
         JsonApiRestResource.doGet();
 
@@ -59,7 +59,7 @@ private class JsonApiRestResourceTest {
 
     @IsTest
     static void exactMediaTypeAcceptIsAccepted() {
-        RestRequest req = newRequest('GET', '/services/apexrest/jsonapi/accounts');
+        RestRequest req = newRequest('GET', '/services/apexrest/jsonapi/v1/accounts');
         req.addHeader('Accept', JsonApiConstants.MEDIA_TYPE);
 
         JsonApiRestResource.doGet();
@@ -69,7 +69,7 @@ private class JsonApiRestResourceTest {
 
     @IsTest
     static void unknownTypeRendersErrorDocument() {
-        newRequest('GET', '/services/apexrest/jsonapi/widgets');
+        newRequest('GET', '/services/apexrest/jsonapi/v1/widgets');
 
         JsonApiRestResource.doGet();
 
@@ -81,7 +81,7 @@ private class JsonApiRestResourceTest {
 
     @IsTest
     static void parameterizedJsonApiMediaTypeIsNotAcceptable() {
-        RestRequest req = newRequest('GET', '/services/apexrest/jsonapi/accounts');
+        RestRequest req = newRequest('GET', '/services/apexrest/jsonapi/v1/accounts');
         // Parameterized JSON:API media type (e.g., with charset) is still not allowed
         req.addHeader('Accept', JsonApiConstants.MEDIA_TYPE_JSON_API + ';charset=utf-8');
 
@@ -101,7 +101,7 @@ private class JsonApiRestResourceTest {
     static void observabilityCapturesSuccessfulRequest() {
         CapturingObserver obs = new CapturingObserver();
         JsonApiObservability.setObserver(obs);
-        newRequest('GET', '/services/apexrest/jsonapi/accounts');
+        newRequest('GET', '/services/apexrest/jsonapi/v1/accounts');
 
         JsonApiRestResource.doGet();
 
@@ -109,6 +109,7 @@ private class JsonApiRestResourceTest {
         System.assertNotEquals(null, obs.last, 'observer received a log');
         System.assertEquals(200, obs.last.statusCode);
         System.assertEquals('accounts', obs.last.resourceType);
+        System.assertEquals('v1', obs.last.apiVersion, 'version captured in telemetry');
         System.assertEquals('GET', obs.last.method);
         System.assert(obs.last.rows >= 1, 'rows recorded');
         System.assert(obs.last.soqlQueries >= 1, 'soql recorded');
@@ -119,7 +120,7 @@ private class JsonApiRestResourceTest {
     static void observabilityCapturesError() {
         CapturingObserver obs = new CapturingObserver();
         JsonApiObservability.setObserver(obs);
-        newRequest('GET', '/services/apexrest/jsonapi/widgets');
+        newRequest('GET', '/services/apexrest/jsonapi/v1/widgets');
 
         JsonApiRestResource.doGet();
 
@@ -144,9 +145,9 @@ private class JsonApiRestResourceTest {
     @IsTest
     static void segmentsAreExtractedAfterBase() {
         List<String> segments = JsonApiRestResource.segmentsOf(
-            '/services/apexrest/jsonapi/accounts/001000000000001/contacts');
+            '/services/apexrest/jsonapi/v1/accounts/001000000000001/contacts');
         System.assertEquals(
-            new List<String>{ 'accounts', '001000000000001', 'contacts' }, segments);
+            new List<String>{ 'v1', 'accounts', '001000000000001', 'contacts' }, segments);
     }
 
     @IsTest
