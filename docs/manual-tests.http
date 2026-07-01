@@ -20,6 +20,7 @@
 @baseUrl     = {{instanceUrl}}/services/apexrest/jsonapi
 @token       = REPLACE_WITH_ACCESS_TOKEN
 @accountId   = REPLACE_WITH_ACCOUNT_ID
+@accountId2  = REPLACE_WITH_ANOTHER_ACCOUNT_ID
 @contactId   = REPLACE_WITH_CONTACT_ID
 @mediaType   = application/json
 
@@ -80,6 +81,11 @@ Accept: {{mediaType}}
 
 ### Filter (like: wildcard)
 GET {{baseUrl}}/accounts?filter[name][like]=Ac%25
+Authorization: Bearer {{token}}
+Accept: {{mediaType}}
+
+### Filter by id (comma-separated -> IN)
+GET {{baseUrl}}/accounts?filter[id]={{accountId}},{{accountId2}}
 Authorization: Bearer {{token}}
 Accept: {{mediaType}}
 

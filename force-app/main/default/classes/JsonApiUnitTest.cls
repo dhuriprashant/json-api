@@ -138,6 +138,49 @@ private class JsonApiUnitTest {
         }
     }
 
+    @IsTest
+    static void builderFiltersByIdListWithTypedBind() {
+        Id a1 = fakeId(Account.SObjectType, 1);
+        Id a2 = fakeId(Account.SObjectType, 2);
+        JsonApiQueryOptions opts = new JsonApiQueryOptions();
+        opts.filters.add(new JsonApiQueryOptions.FilterCondition('id', 'in', a1 + ',' + a2));
+
+        JsonApiQueryBuilder b = new JsonApiQueryBuilder(new AccountResourceConfig(), opts);
+        String soql = b.buildCollectionQuery();
+
+        System.assert(soql.contains('Id IN :'), soql);
+        System.assert(b.binds.get('f0') instanceof List<Id>, 'id list binds as List<Id>');
+    }
+
+    @IsTest
+    static void builderFiltersBySingleIdEquality() {
+        Id a1 = fakeId(Account.SObjectType, 1);
+        JsonApiQueryOptions opts = new JsonApiQueryOptions();
+        opts.filters.add(new JsonApiQueryOptions.FilterCondition('id', 'eq', a1));
+
+        JsonApiQueryBuilder b = new JsonApiQueryBuilder(new AccountResourceConfig(), opts);
+        String soql = b.buildCollectionQuery();
+
+        System.assert(soql.contains('Id = :'), soql);
+        System.assert(b.binds.get('f0') instanceof Id, 'single id binds as Id');
+    }
+
+    @IsTest
+    static void builderRejectsMalformedId() {
+        JsonApiQueryOptions opts = new JsonApiQueryOptions();
+        opts.filters.add(new JsonApiQueryOptions.FilterCondition('id', 'eq', 'not-an-id'));
+        assertBuilderBadRequest(opts);
+    }
+
+    @IsTest
+    static void builderRejectsWrongSObjectTypeId() {
+        // Filtering accounts by a Contact id must be a clean 400, not a 500.
+        Id contactId = fakeId(Contact.SObjectType, 1);
+        JsonApiQueryOptions opts = new JsonApiQueryOptions();
+        opts.filters.add(new JsonApiQueryOptions.FilterCondition('id', 'in', contactId));
+        assertBuilderBadRequest(opts);
+    }
+
     // ---- Service routing (DML-free, via the in-memory gateway) ----
 
     private static JsonApiTestQueryGateway routingGateway() {

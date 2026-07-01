@@ -38,7 +38,7 @@ all enforced under the running user's CRUD/FLS via `AccessLevel.USER_MODE`.
 | Attribute groups      | `?extend=financials,contactInfo` (opt into extra groups beyond `base`) |
 | Sparse fieldsets      | `?fields[accounts]=name,industry`                              |
 | Sorting               | `?sort=-annualRevenue,name`                                    |
-| Filtering             | `?filter[industry]=Technology`; operators via `?filter[annualRevenue][gte]=1000000` (`eq`/`ne`/`gt`/`gte`/`lt`/`lte`/`like`/`in`/`nin`) |
+| Filtering             | `?filter[industry]=Technology`; operators via `?filter[annualRevenue][gte]=1000000` (`eq`/`ne`/`gt`/`gte`/`lt`/`lte`/`like`/`in`/`nin`); by id via `?filter[id]=001...,001...` |
 | Pagination            | `?page[size]=10&page[number]=2` or `?page[limit]=10&page[offset]=20` |
 | Content negotiation   | `application/json` response (accepts both `application/json` and `application/vnd.api+json`) |
 | Error documents       | Spec-compliant `errors[]` with HTTP status, code, source pointer |

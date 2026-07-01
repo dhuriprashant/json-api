@@ -166,6 +166,39 @@ private class JsonApiServiceTest {
     }
 
     @IsTest
+    static void filtersByCommaSeparatedIds() {
+        Map<String, Id> idByName = new Map<String, Id>();
+        for (Account a : [SELECT Id, Name FROM Account]) {
+            idByName.put(a.Name, a.Id);
+        }
+        Id acme = idByName.get('Acme');
+        Id globex = idByName.get('Globex');
+
+        JsonApiResponse r = handle('GET', new List<String>{ 'accounts' },
+            new Map<String, String>{ 'filter[id]' => acme + ',' + globex }, null);
+
+        List<JsonApiResourceObject> data = (List<JsonApiResourceObject>) r.document.data;
+        System.assertEquals(2, data.size(), 'only the two requested ids');
+        Set<String> got = new Set<String>();
+        for (JsonApiResourceObject o : data) {
+            got.add(o.id);
+        }
+        System.assert(got.contains(String.valueOf(acme)) && got.contains(String.valueOf(globex)), got + '');
+    }
+
+    @IsTest
+    static void filterByWrongTypeIdIsBadRequest() {
+        Id contactId = [SELECT Id FROM Contact LIMIT 1].Id;
+        try {
+            handle('GET', new List<String>{ 'accounts' },
+                new Map<String, String>{ 'filter[id]' => contactId }, null);
+            System.assert(false, 'expected a 400');
+        } catch (JsonApiException e) {
+            System.assertEquals(400, e.httpStatus);
+        }
+    }
+
+    @IsTest
     static void getsRelatedToManyCollection() {
         Id id = acme().Id;
         JsonApiResponse r = handle('GET', new List<String>{ 'accounts', id, 'contacts' },

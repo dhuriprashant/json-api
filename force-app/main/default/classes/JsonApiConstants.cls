@@ -28,6 +28,11 @@ public with sharing class JsonApiConstants {
     /** Reserved path segment for the diagnostics/health endpoint (not a resource type). */
     public static final String HEALTH_PATH = '_health';
 
+    /** Reserved filter attribute for the resource id, and its SObject field. The id
+     *  is never declared in attribute groups, so it is special-cased everywhere. */
+    public static final String ID_ATTRIBUTE = 'id';
+    public static final String ID_FIELD = 'Id';
+
     // ---- Pagination sub-keys ----
     public static final String PAGE_LIMIT = 'limit';
     public static final String PAGE_OFFSET = 'offset';

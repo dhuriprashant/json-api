@@ -163,7 +163,10 @@ public with sharing class JsonApiRequestParser {
         String op,
         String value
     ) {
-        if (!config.hasAttribute(attr)) {
+        // The resource id is always filterable even though it is not declared as
+        // an attribute (it maps to the SObject `Id` field).
+        Boolean isId = attr.equalsIgnoreCase(JsonApiConstants.ID_ATTRIBUTE);
+        if (!isId && !config.hasAttribute(attr)) {
             throw JsonApiException.badRequest(
                 'Cannot filter by unknown attribute "' + attr + '".',
                 JsonApiErrorSource.forParameter('filter[' + attr + ']'));
@@ -174,6 +177,11 @@ public with sharing class JsonApiRequestParser {
                 'Unsupported filter operator "' + op + '" on "' + attr +
                 '". Supported: ' + String.join(new List<String>(FILTER_OPERATORS), ', ') + '.',
                 JsonApiErrorSource.forParameter('filter[' + attr + '][' + op + ']'));
+        }
+        // A bare, comma-separated id filter is the common "fetch these N records"
+        // case, so promote `filter[id]=a,b,c` to an IN.
+        if (isId && String.isBlank(op) && value != null && value.contains(',')) {
+            operator = 'in';
         }
         opts.filters.add(new JsonApiQueryOptions.FilterCondition(attr, operator, value));
     }

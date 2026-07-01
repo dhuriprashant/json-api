@@ -108,7 +108,10 @@ public with sharing class JsonApiQueryBuilder {
      * bind variable, so the result is injection-safe.
      */
     private String buildClause(JsonApiQueryOptions.FilterCondition fc) {
-        String fieldName = config.fieldFor(fc.attribute);
+        // The id "attribute" maps to the SObject Id field (it is not in any group).
+        String fieldName = fc.attribute.equalsIgnoreCase(JsonApiConstants.ID_ATTRIBUTE)
+            ? JsonApiConstants.ID_FIELD
+            : config.fieldFor(fc.attribute);
         String bindName = 'f' + (bindCounter++);
         switch on fc.operator {
             when 'ne' {
@@ -195,11 +198,18 @@ public with sharing class JsonApiQueryBuilder {
                     for (String s : raw) { out.add(Boolean.valueOf(s)); }
                     return out;
                 }
+                when ID {
+                    List<Id> out = new List<Id>();
+                    for (String s : raw) { out.add(parseId(s)); }
+                    return out;
+                }
                 when else {
-                    // Text, picklist, reference/Id, email, phone, … all bind as strings.
+                    // Text, picklist, reference, email, phone, … all bind as strings.
                     return raw;
                 }
             }
+        } catch (JsonApiException je) {
+            throw je; // precise id errors must survive the generic fallback below
         } catch (Exception e) {
             throw JsonApiException.badRequest(
                 'Filter list value "' + csv + '" is not valid for this field.',
@@ -242,14 +252,37 @@ public with sharing class JsonApiQueryBuilder {
                 when Datetime {
                     return Datetime.valueOf(value);
                 }
+                when ID {
+                    return parseId(value);
+                }
                 when else {
                     return value;
                 }
             }
+        } catch (JsonApiException je) {
+            throw je; // a precise id error must survive the generic fallback below
         } catch (Exception e) {
             throw JsonApiException.badRequest(
                 'Filter value "' + value + '" is not valid for this field.',
                 JsonApiErrorSource.forParameter('filter'));
         }
+    }
+
+    /** Validates an id string's format and that it belongs to this resource's SObject. */
+    private Id parseId(String value) {
+        Id parsed;
+        try {
+            parsed = Id.valueOf(value == null ? null : value.trim());
+        } catch (Exception e) {
+            throw JsonApiException.badRequest(
+                '"' + value + '" is not a valid id.',
+                JsonApiErrorSource.forParameter('filter[id]'));
+        }
+        if (parsed.getSObjectType() != config.getSObjectType()) {
+            throw JsonApiException.badRequest(
+                '"' + value + '" is not a valid id for ' + config.getType() + '.',
+                JsonApiErrorSource.forParameter('filter[id]'));
+        }
+        return parsed;
     }
 }

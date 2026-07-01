@@ -32,6 +32,10 @@
       "value": "REPLACE_WITH_ACCOUNT_ID"
     },
     {
+      "key": "accountId2",
+      "value": "REPLACE_WITH_ANOTHER_ACCOUNT_ID"
+    },
+    {
       "key": "contactId",
       "value": "REPLACE_WITH_CONTACT_ID"
     },
@@ -301,6 +305,33 @@
                 {
                   "key": "filter[name][like]",
                   "value": "Ac%25"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Filter by id (comma-separated -> IN)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "{{mediaType}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/accounts?filter[id]={{accountId}},{{accountId2}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "accounts"
+              ],
+              "query": [
+                {
+                  "key": "filter[id]",
+                  "value": "{{accountId}},{{accountId2}}"
                 }
               ]
             }
@@ -1138,6 +1169,33 @@
                 {
                   "key": "filter[industry][bogusop]",
                   "value": "x"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "400 - malformed id filter",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "{{mediaType}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/accounts?filter[id]=not-an-id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "accounts"
+              ],
+              "query": [
+                {
+                  "key": "filter[id]",
+                  "value": "not-an-id"
                 }
               ]
             }

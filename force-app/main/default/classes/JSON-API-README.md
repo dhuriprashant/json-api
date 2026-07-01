@@ -56,6 +56,7 @@ Everything is served under `/services/apexrest/jsonapi`.
 | `sort`               | `?sort=-annualRevenue,name`          | `-` prefix = descending                 |
 | `filter[ATTR]`       | `?filter[industry]=Technology`       | Equality; multiple filters are AND-ed   |
 | `filter[ATTR][OP]`   | `?filter[annualRevenue][gte]=1000000`| Operators: `eq` `ne` `gt` `gte` `lt` `lte` `like` `in` `nin`. `in`/`nin` take a comma-separated list; a bare `filter[ATTR]` means `eq` |
+| `filter[id]`         | `?filter[id]=001...,001...`          | Fetch specific records by id. A comma-separated list is treated as `in`; a single id as `eq`. Ids are validated against the resource's SObject type (bad/mismatched → `400`) |
 | `page[size]`,`page[number]` | `?page[size]=10&page[number]=2`| Page-based pagination                    |
 | `page[limit]`,`page[offset]`| `?page[limit]=10&page[offset]=20`| Offset-based pagination                 |
 

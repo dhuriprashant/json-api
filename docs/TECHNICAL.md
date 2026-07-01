@@ -284,6 +284,12 @@ it injection-proof:
    `Database.queryWithBinds(soql, binds, AccessLevel.USER_MODE)`. The operator
    itself is whitelisted by the parser, so it can never inject SOQL either.
 
+The reserved `filter[id]` maps to the SObject `Id` field (it is not a declared
+attribute). A bare comma-separated value is promoted to `in`; `parseId()` validates
+each id's format and that it belongs to this resource's SObject type (→ `400`), and
+the `ID` branch of `coerce`/`coerceList` binds `Id` / `List<Id>` so the SOQL is
+type-correct.
+
 ### Field selection
 
 `selectFields()` returns a `Set<String>`:

@@ -323,6 +323,13 @@ Filtering supports `eq` `ne` `gt` `gte` `lt` `lte` `like` `in` `nin` via
 `filter[attr][op]` (bare `filter[attr]` means `eq`). Conditions are AND-ed; multiple
 conditions may target one attribute (e.g. a `gte`/`lt` range).
 
+The resource **id** is always filterable even though it is not declared as an
+attribute: `filter[id]` maps to the SObject `Id` field. A bare comma-separated value
+(`filter[id]=001...,001...`) is promoted to `in` — the common "fetch these N records"
+case — while a single value stays `eq`; explicit operators (`filter[id][in]=...`)
+also work. Ids are validated for format and SObject type in the builder
+(`parseId()`), so a malformed or wrong-type id is a clean `400`, not a `500`.
+
 > **Typed `IN` binds.** SOQL rejects a `List<Object>` (ANY-typed) bind for `IN`. So
 > `coerceList()` builds a list whose element type matches the column
 > (`List<Double>`, `List<Integer>`, …). If you add an operator that binds a
@@ -601,6 +608,7 @@ changing the engine.
 | `sort` | `?sort=-annualRevenue,name` | `-` prefix = descending |
 | `filter[ATTR]` | `?filter[industry]=Technology` | equality (`eq`) |
 | `filter[ATTR][OP]` | `?filter[annualRevenue][gte]=1000000` | `eq` `ne` `gt` `gte` `lt` `lte` `like` `in` `nin` |
+| `filter[id]` | `?filter[id]=001...,001...` | fetch by id; comma list → `in`, single → `eq`; validated against the resource's SObject type |
 | `page[size]` / `page[number]` | `?page[size]=10&page[number]=2` | page-based |
 | `page[limit]` / `page[offset]` | `?page[limit]=10&page[offset]=20` | offset-based |
 

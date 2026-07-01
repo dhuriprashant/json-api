@@ -66,6 +66,30 @@ private class JsonApiRequestParserTest {
     }
 
     @IsTest
+    static void parsesBareIdFilterWithCommasAsIn() {
+        JsonApiQueryOptions opts = JsonApiRequestParser.parse(
+            new Map<String, String>{ 'filter[id]' => '001000000000001,001000000000002' }, config());
+        System.assertEquals(1, opts.filters.size());
+        JsonApiQueryOptions.FilterCondition fc = opts.filters[0];
+        System.assertEquals('id', fc.attribute.toLowerCase());
+        System.assertEquals('in', fc.operator, 'bare comma-separated id filter -> in');
+    }
+
+    @IsTest
+    static void parsesSingleIdFilterAsEq() {
+        JsonApiQueryOptions opts = JsonApiRequestParser.parse(
+            new Map<String, String>{ 'filter[id]' => '001000000000001' }, config());
+        System.assertEquals('eq', opts.filters[0].operator, 'single id stays eq');
+    }
+
+    @IsTest
+    static void parsesExplicitIdInOperator() {
+        JsonApiQueryOptions opts = JsonApiRequestParser.parse(
+            new Map<String, String>{ 'filter[id][in]' => '001000000000001,001000000000002' }, config());
+        System.assertEquals('in', opts.filters[0].operator);
+    }
+
+    @IsTest
     static void rejectsUnsupportedFilterOperator() {
         assertBadRequest(new Map<String, String>{ 'filter[industry][bogusop]' => 'x' });
     }
