@@ -10,12 +10,12 @@ compound documents (`include`), content negotiation and spec-compliant errors.
 All data access runs in `AccessLevel.USER_MODE`, so object- and field-level
 security is enforced by the platform for the running user.
 
-> 🛠️ To **work on** the framework — adding resources, internals, dev workflow,
-> extending & maintaining — see the
-> [developer guide](../../../../docs/DEVELOPER_GUIDE.md).
-> 🏗️ For internals — request lifecycle, SOQL generation, include resolution
-> algorithm, security model, extension points — see the
-> [technical design doc](../../../../docs/TECHNICAL.md).
+> 🧭 To **work on** the framework — overview, adding resources, internals, dev
+> workflow, extending & maintaining — start with the **team guide**:
+> [`docs/DEVELOPER_GUIDE.md`](../../../../docs/DEVELOPER_GUIDE.md). This file is the
+> consumer-facing API reference.
+> 🏗️ For the deepest internals (sequence diagrams, SOQL generation, include
+> algorithm) see the [technical design doc](../../../../docs/TECHNICAL.md).
 
 ---
 

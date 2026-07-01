@@ -8,11 +8,11 @@ framework handles routing, sparse fieldsets, sorting, filtering, pagination,
 compound documents (`include`), content negotiation, and spec-compliant errors —
 all enforced under the running user's CRUD/FLS via `AccessLevel.USER_MODE`.
 
-> 📖 **Usage reference** (endpoints, query params, examples, how to add a resource):
+> 🧭 **Start here — the team guide** (overview, adding resources, internals, dev
+> workflow, extending & maintaining): [`docs/DEVELOPER_GUIDE.md`](docs/DEVELOPER_GUIDE.md)
+> 📖 **API reference** (endpoints, query params, request examples):
 > [`force-app/main/default/classes/JSON-API-README.md`](force-app/main/default/classes/JSON-API-README.md)
-> 🛠️ **Developer guide** (adding resources, internals, dev workflow, extending & maintaining):
-> [`docs/DEVELOPER_GUIDE.md`](docs/DEVELOPER_GUIDE.md)
-> 🏗️ **Technical design** (architecture, request lifecycle, internals, security):
+> 🏗️ **Deep-dive internals** (sequence diagrams, SOQL generation, security):
 > [`docs/TECHNICAL.md`](docs/TECHNICAL.md)
 
 ---

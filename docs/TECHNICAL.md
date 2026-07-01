@@ -1,5 +1,10 @@
 # Apex JSON:API Framework — Technical Design
 
+> 🧭 **New here? Start with the [team guide](DEVELOPER_GUIDE.md).** It's the single
+> end-to-end doc (overview, adding resources, workflow, extending). This document is
+> the **deep-dive internals reference** — read it when you need the sequence
+> diagrams, SOQL-generation details, or include algorithm.
+
 This document describes the internal design of the framework: how a request flows
 through the layers, what each class is responsible for, how SOQL is generated
 safely, the security model, key algorithms, and the extension points. It is aimed

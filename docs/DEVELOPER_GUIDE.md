@@ -1,18 +1,21 @@
-# Developer Guide
+# The Team Guide — Apex JSON:API Framework
 
-A practical, end-to-end guide to **working on** the Apex JSON:API framework:
-adding new resources, understanding how the engine works internally, the
-day-to-day development workflow, and how to extend and maintain it safely.
+**This is the one doc to read.** It's the single, end-to-end guide to the framework:
+what it is, how it works inside, how to add resources, how we develop it, and how to
+extend and maintain it safely. New to the codebase? Read §0 and §1, then jump to
+whatever you need.
 
-> This is the **contributor / extender** guide. For a condensed architecture
-> reference see [`TECHNICAL.md`](TECHNICAL.md); for the **consumer** API reference
-> (endpoints, query params, examples) see
-> [`../force-app/main/default/classes/JSON-API-README.md`](../force-app/main/default/classes/JSON-API-README.md).
+> Companion docs (all secondary to this one):
+> [`JSON-API-README.md`](../force-app/main/default/classes/JSON-API-README.md) — the
+> consumer-facing API reference (endpoints, query params, request examples);
+> [`TECHNICAL.md`](TECHNICAL.md) — the deep-dive internals reference (sequence
+> diagrams, SOQL generation, include algorithm). When in doubt, start here.
 
 ---
 
 ## Table of contents
 
+0. [Overview — start here](#0-overview--start-here)
 1. [The core idea](#1-the-core-idea)
 2. [Adding a new resource — full walkthrough](#2-adding-a-new-resource--full-walkthrough)
 3. [How the framework works](#3-how-the-framework-works)
@@ -20,6 +23,64 @@ day-to-day development workflow, and how to extend and maintain it safely.
 5. [Extending the framework](#5-extending-the-framework)
 6. [Maintenance & gotchas](#6-maintenance--gotchas)
 7. [Reference](#7-reference)
+
+---
+
+## 0. Overview — start here
+
+### What it is
+
+A configuration-driven Apex framework that exposes Salesforce SObjects over a REST
+API conforming to [JSON:API v1.1](https://jsonapi.org/format/). You describe each
+SObject **once** (a small config class + a Custom Metadata record) and the framework
+handles routing, versioning, sparse fieldsets, sorting, filtering, pagination,
+compound documents (`include`), content negotiation, and spec-compliant errors.
+
+It is **read-only** (GET only) and every query runs in `AccessLevel.USER_MODE`, so
+the platform enforces the running user's CRUD/FLS automatically.
+
+### What you get, at a glance
+
+| Capability | Example |
+|------------|---------|
+| Versioned resources | `GET /jsonapi/v1/accounts`, `GET /jsonapi/v2/accounts` (same type, different fields) |
+| Read one / many | `/{version}/{type}` and `/{version}/{type}/{id}` |
+| Relationships | `/{version}/{type}/{id}/{rel}` and `.../relationships/{rel}` |
+| Compound docs | `?include=parent,contacts` (nested, e.g. `contacts.account`) |
+| Attribute groups | `?extend=financials,contactInfo` (opt into extra fields beyond `base`) |
+| Sparse fieldsets | `?fields[accounts]=name,industry` |
+| Sorting | `?sort=-annualRevenue,name` |
+| Filtering | `?filter[industry]=Technology`, operators `?filter[revenue][gte]=1000000`, by id `?filter[id]=001...,001...` |
+| Pagination | `?page[size]=10&page[number]=2` or `?page[limit]=10&page[offset]=20` |
+| Diagnostics | `GET /jsonapi/_health` — registered resources + registration failures |
+
+Ships with `v1` `accounts`/`contacts` and a `v2` of `accounts` (adds `rating`).
+
+### The 30-second architecture
+
+```
+HTTP  ─►  JsonApiRestResource   (content negotiation, response, telemetry)
+             │
+          JsonApiService        (strip version → route → assemble document)
+             │
+   ┌─────────┼──────────────────────────────────────────────┐
+   ▼         ▼                    ▼               ▼           ▼
+Registry   RequestParser      QueryBuilder     Gateway     Serializer / IncludeResolver
+(version/  (params →          (config+options  (USER_MODE  (SObject → JSON:API doc)
+ type →     QueryOptions)      → SOQL+binds)    SOQL)
+ config)
+```
+
+Every arrow is generic; the only thing that varies per resource is the **config**
+(`JsonApiResourceConfig` subclass) the registry hands back. That's the whole design:
+**add a config → get a fully-featured, versioned endpoint, no engine changes.**
+
+### How to read this guide
+
+- **Just need to add a resource?** → [§2](#2-adding-a-new-resource--full-walkthrough) (and [§5](#5-extending-the-framework) for a new *version*).
+- **Reviewing / debugging the engine?** → [§3](#3-how-the-framework-works).
+- **Setting up to develop/test?** → [§4](#4-how-the-framework-is-developed).
+- **About to change core code?** → skim [§6](#6-maintenance--gotchas) first; those are the traps.
 
 ---
 
